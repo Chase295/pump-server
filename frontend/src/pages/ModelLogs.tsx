@@ -28,8 +28,6 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  IconButton,
-  Collapse,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -48,7 +46,6 @@ import {
   HourglassEmpty as WaitIcon,
   TrendingUp as UpIcon,
   TrendingDown as DownIcon,
-  FilterList as FilterIcon,
   Clear as ClearIcon,
   Delete as DeleteIcon,
   OpenInNew as OpenIcon
@@ -69,18 +66,33 @@ const ModelLogs: React.FC = () => {
   const [showAll, setShowAll] = React.useState(false); // Option: Alle Einträge anzeigen
   const queryClient = useQueryClient();
   
-  // Filter-State
-  // WICHTIG: predictionStatus wird NUR Frontend-seitig gefiltert (nicht an Backend gesendet)
-  // includeNonAlerts ist immer true (wird nicht mehr als Filter-State gespeichert)
+  // Erweiterter Filter-State für alle neuen Filter-Optionen
   const [filters, setFilters] = React.useState<{
-    status?: 'pending' | 'success' | 'failed' | 'expired';
-    predictionStatus?: 'negativ' | 'positiv' | 'alert';  // NUR Frontend-Filter (blendet nur aus)
+    // Coin ID
     coinId?: string;
-    predictionType?: 'time_based' | 'classic';
-    dateFrom?: string;
-    dateTo?: string;
+    // Wahrscheinlichkeit
+    probabilityOperator?: '>' | '<' | '=';
+    probabilityValue?: number;
+    // Vorhersage-Status (Mehrfachauswahl)
+    predictionStatuses?: ('negativ' | 'positiv' | 'alert')[];
+    // Auswertung (Mehrfachauswahl)
+    evaluationStatuses?: ('success' | 'failed' | 'wait')[];
+    // ATH Highest
+    athHighestOperator?: '>' | '<' | '=';
+    athHighestValue?: number;
+    // ATH Lowest
+    athLowestOperator?: '>' | '<' | '=';
+    athLowestValue?: number;
+    // Tatsächliche Änderung
+    actualChangeOperator?: '>' | '<' | '=';
+    actualChangeValue?: number;
+    // Alert-Zeit (von-bis)
+    alertTimeFrom?: string;
+    alertTimeTo?: string;
+    // Auswertungs-Zeit (von-bis)
+    evaluationTimeFrom?: string;
+    evaluationTimeTo?: string;
   }>({});
-  const [filtersExpanded, setFiltersExpanded] = React.useState(false);
   
   // Reset-Dialog State
   const [resetDialogOpen, setResetDialogOpen] = React.useState(false);
@@ -114,15 +126,39 @@ const ModelLogs: React.FC = () => {
     error: alertsError,
     refetch: refetchAlerts
   } = useQuery({
-    queryKey: ['model-predictions', 'model', id, page, showAll, filters.status, filters.predictionStatus, filters.coinId],
+    queryKey: ['model-predictions', 'model', id, page, showAll,
+      // Alle neuen Filter-Eigenschaften
+      filters.coinId,
+      filters.probabilityOperator, filters.probabilityValue,
+      filters.predictionStatuses?.join(','),
+      filters.evaluationStatuses?.join(','),
+      filters.athHighestOperator, filters.athHighestValue,
+      filters.athLowestOperator, filters.athLowestValue,
+      filters.actualChangeOperator, filters.actualChangeValue,
+      filters.alertTimeFrom, filters.alertTimeTo,
+      filters.evaluationTimeFrom, filters.evaluationTimeTo
+    ],
     queryFn: () => {
       // Wenn "Alle anzeigen" aktiviert, lade alle Einträge (limit = 10000)
       const limit = showAll ? 10000 : ITEMS_PER_PAGE;
       const offset = showAll ? 0 : (page - 1) * ITEMS_PER_PAGE;
       return modelPredictionsApi.getForModel(id, limit, offset, {
-        tag: filters.predictionStatus,  // 'negativ' | 'positiv' | 'alert'
-        status: filters.status ? (filters.status === 'pending' ? 'aktiv' : 'inaktiv') : undefined,  // Map old status to new
-        coinId: filters.coinId
+        // Neue erweiterte Filter
+        coinId: filters.coinId,
+        probabilityOperator: filters.probabilityOperator,
+        probabilityValue: filters.probabilityValue,
+        predictionStatuses: filters.predictionStatuses,
+        evaluationStatuses: filters.evaluationStatuses,
+        athHighestOperator: filters.athHighestOperator,
+        athHighestValue: filters.athHighestValue,
+        athLowestOperator: filters.athLowestOperator,
+        athLowestValue: filters.athLowestValue,
+        actualChangeOperator: filters.actualChangeOperator,
+        actualChangeValue: filters.actualChangeValue,
+        alertTimeFrom: filters.alertTimeFrom,
+        alertTimeTo: filters.alertTimeTo,
+        evaluationTimeFrom: filters.evaluationTimeFrom,
+        evaluationTimeTo: filters.evaluationTimeTo
       });
     },
     enabled: !!id,
@@ -255,32 +291,33 @@ const ModelLogs: React.FC = () => {
   // Auswertung: pending/wait, success, failed
   // WICHTIG: 'non_alert' Einträge werden auch evaluiert (mit ATH-Tracking)!
   const getEvaluationStatus = (alert: AlertEvaluation): { label: string; color: 'default' | 'success' | 'error' | 'warning'; icon?: React.ReactElement } => {
-    const status = alert.status;
-    
-    // Normalisiere Status (kann String oder undefined sein)
-    const normalizedStatus = status?.toString().toLowerCase() || '';
-    
-    // Wenn bereits evaluiert (success/failed), zeige das Ergebnis
-    if (normalizedStatus === 'success') {
+    // Priorität 1: evaluation_result (success/failed)
+    if (alert.evaluation_result === 'success') {
       return {
         label: 'Success',
         color: 'success',
         icon: <SuccessIcon fontSize="small" />
       };
-    } else if (normalizedStatus === 'failed') {
+    } else if (alert.evaluation_result === 'failed') {
       return {
         label: 'Failed',
         color: 'error',
         icon: <FailedIcon fontSize="small" />
       };
-    } else if (normalizedStatus === 'expired') {
+    }
+
+    // Priorität 2: status Feld (aktiv/inaktiv)
+    const status = alert.status;
+    const normalizedStatus = status?.toString().toLowerCase() || '';
+
+    if (normalizedStatus === 'expired') {
       return {
         label: 'Expired',
         color: 'warning',
         icon: <WaitIcon fontSize="small" />
       };
     }
-    
+
     // 'non_alert' oder 'pending': Prüfe ob evaluation_timestamp erreicht wurde
     // WICHTIG: Alle nicht-evaluierten Einträge zeigen "Wait"
     if (normalizedStatus === 'non_alert' || normalizedStatus === 'pending' || !normalizedStatus) {
@@ -534,141 +571,6 @@ const ModelLogs: React.FC = () => {
           Detaillierte Historie der Alert-Auswertungen für Modell {modelName}.
         </Typography>
 
-        {/* Filter-Section */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: filtersExpanded ? 2 : 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FilterIcon />
-                <Typography variant="h6">Filter</Typography>
-                {hasActiveFilters && (
-                  <Chip
-                    label={`${Object.keys(filters).length} aktiv`}
-                    size="small"
-                    color="primary"
-                  />
-                )}
-              </Box>
-              <Box>
-                {hasActiveFilters && (
-                  <Button
-                    size="small"
-                    startIcon={<ClearIcon />}
-                    onClick={handleClearFilters}
-                    sx={{ mr: 1 }}
-                  >
-                    Filter zurücksetzen
-                  </Button>
-                )}
-                <IconButton
-                  onClick={() => setFiltersExpanded(!filtersExpanded)}
-                  size="small"
-                >
-                  <FilterIcon />
-                </IconButton>
-              </Box>
-            </Box>
-
-            <Collapse in={filtersExpanded}>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(2, 1fr)',
-                    md: 'repeat(3, 1fr)'
-                  },
-                  gap: 2
-                }}
-              >
-                <FormControl fullWidth size="small">
-                  <InputLabel>Auswertungs-Status</InputLabel>
-                  <Select
-                    value={filters.status || ''}
-                    label="Auswertungs-Status"
-                    onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
-                  >
-                    <MenuItem value="">Alle</MenuItem>
-                    <MenuItem value="pending">Wait</MenuItem>
-                    <MenuItem value="success">Success</MenuItem>
-                    <MenuItem value="failed">Failed</MenuItem>
-                    <MenuItem value="expired">Expired</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth size="small">
-                  <InputLabel>Vorhersage-Status</InputLabel>
-                  <Select
-                    value={filters.predictionStatus || ''}
-                    label="Vorhersage-Status"
-                    onChange={(e) => handleFilterChange('predictionStatus', e.target.value || undefined)}
-                  >
-                    <MenuItem value="">Alle</MenuItem>
-                    <MenuItem value="negativ">Negativ (&lt;50%)</MenuItem>
-                    <MenuItem value="positiv">Positiv (≥50%)</MenuItem>
-                    <MenuItem value="alert">Alert (≥{((model?.alert_threshold || 0.7) * 100).toFixed(0)}%)</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth size="small">
-                  <InputLabel>Vorhersage-Typ</InputLabel>
-                  <Select
-                    value={filters.predictionType || ''}
-                    label="Vorhersage-Typ"
-                    onChange={(e) => handleFilterChange('predictionType', e.target.value || undefined)}
-                  >
-                    <MenuItem value="">Alle</MenuItem>
-                    <MenuItem value="time_based">Zeitbasiert</MenuItem>
-                    <MenuItem value="classic">Klassisch</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Coin-ID"
-                  value={filters.coinId || ''}
-                  onChange={(e) => handleFilterChange('coinId', e.target.value || undefined)}
-                  placeholder="z.B. F8t3Wmk9..."
-                />
-
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Von Datum"
-                  type="datetime-local"
-                  value={filters.dateFrom || ''}
-                  onChange={(e) => handleFilterChange('dateFrom', e.target.value || undefined)}
-                  InputLabelProps={{ shrink: true }}
-                />
-
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Bis Datum"
-                  type="datetime-local"
-                  value={filters.dateTo || ''}
-                  onChange={(e) => handleFilterChange('dateTo', e.target.value || undefined)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Box>
-              
-              {/* Info: Alle Vorhersagen werden geladen */}
-              <Box sx={{ mt: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={true}
-                      disabled={true}
-                      color="primary"
-                    />
-                  }
-                  label="Alle Vorhersagen werden geladen (Alerts + Non-Alerts)"
-                />
-              </Box>
-            </Collapse>
-          </CardContent>
-        </Card>
 
         {/* Erweiterte Statistiken */}
         <Box sx={{ mb: 3 }}>
@@ -930,6 +832,225 @@ const ModelLogs: React.FC = () => {
           </Box>
         </Box>
       </Box>
+
+      {/* Filter Card */}
+      <Card sx={{ mb: 2, boxShadow: 2 }}>
+        <CardContent sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography variant="h6" color="primary.main" sx={{ fontWeight: 'bold' }}>
+                🔍 Filter
+              </Typography>
+              {hasActiveFilters && (
+                <Typography variant="caption" color="text.secondary">
+                  {totalAlerts} Coins entsprechen den aktiven Filtern
+                </Typography>
+              )}
+            </Box>
+            {hasActiveFilters && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilters}
+              >
+                Zurücksetzen
+              </Button>
+            )}
+          </Box>
+
+          {/* Filter Sections - Mehrere Zeilen für bessere Übersichtlichkeit */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+
+            {/* Zeile 1: Basis-Filter */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+              <TextField
+                size="small"
+                label="Coin ID"
+                value={filters.coinId || ''}
+                onChange={(e) => handleFilterChange('coinId', e.target.value || undefined)}
+                placeholder="z.B. F8t3Wmk9..."
+                sx={{ minWidth: 200 }}
+              />
+
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Vorhersage-Status</InputLabel>
+                <Select
+                  multiple
+                  value={filters.predictionStatuses || []}
+                  label="Vorhersage-Status"
+                  onChange={(e) => handleFilterChange('predictionStatuses', e.target.value as ('negativ' | 'positiv' | 'alert')[])}
+                  renderValue={(selected) => (selected as string[]).join(', ')}
+                >
+                  <MenuItem value="negativ">Negativ</MenuItem>
+                  <MenuItem value="positiv">Positiv</MenuItem>
+                  <MenuItem value="alert">Alert</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Auswertung</InputLabel>
+                <Select
+                  multiple
+                  value={filters.evaluationStatuses || []}
+                  label="Auswertung"
+                  onChange={(e) => handleFilterChange('evaluationStatuses', e.target.value as ('success' | 'failed' | 'wait')[])}
+                  renderValue={(selected) => (selected as string[]).join(', ')}
+                >
+                  <MenuItem value="success">Success</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                  <MenuItem value="wait">Wait</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Zeile 2: Wahrscheinlichkeit & Tatsächliche Änderung */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Operator</InputLabel>
+                  <Select
+                    value={filters.probabilityOperator || ''}
+                    label="Operator"
+                    onChange={(e) => handleFilterChange('probabilityOperator', e.target.value || undefined)}
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    <MenuItem value=">">&gt;</MenuItem>
+                    <MenuItem value="<">&lt;</MenuItem>
+                    <MenuItem value="=">=</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Wahrscheinlichkeit"
+                  value={filters.probabilityValue || ''}
+                  onChange={(e) => handleFilterChange('probabilityValue', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  sx={{ minWidth: 120 }}
+                />
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Operator</InputLabel>
+                  <Select
+                    value={filters.actualChangeOperator || ''}
+                    label="Operator"
+                    onChange={(e) => handleFilterChange('actualChangeOperator', e.target.value || undefined)}
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    <MenuItem value=">">&gt;</MenuItem>
+                    <MenuItem value="<">&lt;</MenuItem>
+                    <MenuItem value="=">=</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Tatsächliche Änderung %"
+                  value={filters.actualChangeValue || ''}
+                  onChange={(e) => handleFilterChange('actualChangeValue', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  sx={{ minWidth: 120 }}
+                />
+              </Box>
+            </Box>
+
+            {/* Zeile 3: ATH Werte */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Operator</InputLabel>
+                  <Select
+                    value={filters.athHighestOperator || ''}
+                    label="Operator"
+                    onChange={(e) => handleFilterChange('athHighestOperator', e.target.value || undefined)}
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    <MenuItem value=">">&gt;</MenuItem>
+                    <MenuItem value="<">&lt;</MenuItem>
+                    <MenuItem value="=">=</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="ATH Highest %"
+                  value={filters.athHighestValue || ''}
+                  onChange={(e) => handleFilterChange('athHighestValue', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  sx={{ minWidth: 120 }}
+                />
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <FormControl size="small" sx={{ minWidth: 80 }}>
+                  <InputLabel>Operator</InputLabel>
+                  <Select
+                    value={filters.athLowestOperator || ''}
+                    label="Operator"
+                    onChange={(e) => handleFilterChange('athLowestOperator', e.target.value || undefined)}
+                  >
+                    <MenuItem value="">-</MenuItem>
+                    <MenuItem value=">">&gt;</MenuItem>
+                    <MenuItem value="<">&lt;</MenuItem>
+                    <MenuItem value="=">=</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="ATH Lowest %"
+                  value={filters.athLowestValue || ''}
+                  onChange={(e) => handleFilterChange('athLowestValue', e.target.value ? parseFloat(e.target.value) : undefined)}
+                  sx={{ minWidth: 120 }}
+                />
+              </Box>
+            </Box>
+
+            {/* Zeile 4: Zeitbereiche */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <TextField
+                  size="small"
+                  type="datetime-local"
+                  label="Alert-Zeit von"
+                  value={filters.alertTimeFrom || ''}
+                  onChange={(e) => handleFilterChange('alertTimeFrom', e.target.value || undefined)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  size="small"
+                  type="datetime-local"
+                  label="Alert-Zeit bis"
+                  value={filters.alertTimeTo || ''}
+                  onChange={(e) => handleFilterChange('alertTimeTo', e.target.value || undefined)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+                <TextField
+                  size="small"
+                  type="datetime-local"
+                  label="Auswertungs-Zeit von"
+                  value={filters.evaluationTimeFrom || ''}
+                  onChange={(e) => handleFilterChange('evaluationTimeFrom', e.target.value || undefined)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  size="small"
+                  type="datetime-local"
+                  label="Auswertungs-Zeit bis"
+                  value={filters.evaluationTimeTo || ''}
+                  onChange={(e) => handleFilterChange('evaluationTimeTo', e.target.value || undefined)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
+            </Box>
+
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Alerts Tabelle */}
       {alerts.length === 0 ? (

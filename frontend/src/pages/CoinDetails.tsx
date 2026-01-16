@@ -168,7 +168,7 @@ const CoinDetails: React.FC = () => {
 
   // Alert- und Evaluation-Zeitpunkte + BASIS-PREIS für Chart
   const evaluationMarkers = React.useMemo(() => {
-    // Zuerst versuchen wir alert_evaluations (für Alerts)
+    // Zuerst versuchen wir alert_evaluations (für bereits ausgewertete Alerts)
     if (coinDetails?.evaluations?.length) {
       const evaluation = coinDetails.evaluations[0];
       const alertTimestamp = (evaluation as any)?.alert_timestamp;
@@ -180,6 +180,24 @@ const CoinDetails: React.FC = () => {
           endTime: new Date(evaluationTimestamp).getTime(),
           startLabel: "🚨 Alert-Start",
           endLabel: "✅ Evaluation-Ende",
+          // BASIS-PREIS für Chart: Alert-Preis = 0%
+          chartBasePrice: null // Wird später berechnet
+        };
+      }
+    }
+
+    // Zweitens: Schauen nach Alert-Predictions (auch wenn noch nicht ausgewertet)
+    const alertPrediction = coinDetails?.predictions?.find(p => (p as any).tag === 'alert' || (p as any).is_alert);
+    if (alertPrediction) {
+      const alertTimestamp = alertPrediction.prediction_timestamp || alertPrediction.timestamp;
+      const evaluationTimestamp = alertPrediction.evaluation_timestamp;
+
+      if (alertTimestamp && evaluationTimestamp) {
+        return {
+          startTime: new Date(alertTimestamp).getTime(),
+          endTime: new Date(evaluationTimestamp).getTime(),
+          startLabel: "🚨 Alert-Start",
+          endLabel: "⏳ Pending Evaluation",
           // BASIS-PREIS für Chart: Alert-Preis = 0%
           chartBasePrice: null // Wird später berechnet
         };

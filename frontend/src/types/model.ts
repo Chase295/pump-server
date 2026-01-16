@@ -167,7 +167,8 @@ export interface AlertEvaluation {
   coin_id: string;
   prediction_id?: number;
   probability: number;
-  status: 'pending' | 'success' | 'failed' | 'expired' | 'not_applicable' | 'non_alert';
+  status: 'pending' | 'success' | 'failed' | 'expired' | 'not_applicable' | 'non_alert' | 'aktiv' | 'inaktiv';
+  evaluation_result?: 'success' | 'failed' | null;
   alert_timestamp: string;
   evaluation_timestamp?: string;
   predicted_price_change?: number;

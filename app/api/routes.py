@@ -3,7 +3,7 @@ FastAPI Routes für ML Prediction Service
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, HTTPException, Depends, Response, status, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, Response, status, BackgroundTasks, Query
 from fastapi.responses import PlainTextResponse
 import asyncpg
 
@@ -1404,6 +1404,21 @@ async def get_model_predictions_endpoint(
     tag: Optional[str] = None,  # 'negativ', 'positiv', 'alert'
     status: Optional[str] = None,  # 'aktiv', 'inaktiv'
     coin_id: Optional[str] = None,
+    # Neue erweiterte Filter
+    probability_operator: Optional[str] = None,  # '>', '<', '='
+    probability_value: Optional[float] = None,
+    prediction_statuses: Optional[List[str]] = Query(None),  # ['negativ', 'positiv', 'alert']
+    evaluation_statuses: Optional[List[str]] = Query(None),  # ['success', 'failed', 'wait']
+    ath_highest_operator: Optional[str] = None,  # '>', '<', '='
+    ath_highest_value: Optional[float] = None,
+    ath_lowest_operator: Optional[str] = None,  # '>', '<', '='
+    ath_lowest_value: Optional[float] = None,
+    actual_change_operator: Optional[str] = None,  # '>', '<', '='
+    actual_change_value: Optional[float] = None,
+    alert_time_from: Optional[str] = None,
+    alert_time_to: Optional[str] = None,
+    evaluation_time_from: Optional[str] = None,
+    evaluation_time_to: Optional[str] = None,
     limit: int = 100,
     offset: int = 0
 ):
@@ -1441,7 +1456,80 @@ async def get_model_predictions_endpoint(
             conditions.append(f"coin_id = ${param_idx}")
             params.append(coin_id)
             param_idx += 1
-        
+
+        # Neue erweiterte Filter
+        if probability_operator and probability_value is not None:
+            operator_map = {'>': '>', '<': '<', '=': '='}
+            if probability_operator in operator_map:
+                conditions.append(f"probability {operator_map[probability_operator]} ${param_idx}")
+                params.append(probability_value)
+                param_idx += 1
+
+        if prediction_statuses and len(prediction_statuses) > 0:
+            placeholders = ', '.join([f"${param_idx + i}" for i in range(len(prediction_statuses))])
+            conditions.append(f"tag IN ({placeholders})")
+            params.extend(prediction_statuses)
+            param_idx += len(prediction_statuses)
+
+        if evaluation_statuses and len(evaluation_statuses) > 0:
+            # Map evaluation statuses to database values
+            status_map = {
+                'success': 'success',
+                'failed': 'failed',
+                'wait': 'aktiv'  # 'wait' means still active/pending
+            }
+            db_statuses = [status_map.get(s, s) for s in evaluation_statuses if s in status_map]
+            if db_statuses:
+                if 'wait' in evaluation_statuses and 'aktiv' in db_statuses:
+                    # For 'wait', include both 'aktiv' and NULL evaluation_result
+                    conditions.append(f"(evaluation_result IS NULL OR status = 'aktiv')")
+                else:
+                    placeholders = ', '.join([f"${param_idx + i}" for i in range(len(db_statuses))])
+                    conditions.append(f"evaluation_result IN ({placeholders})")
+                    params.extend(db_statuses)
+                    param_idx += len(db_statuses)
+
+        if ath_highest_operator and ath_highest_value is not None:
+            operator_map = {'>': '>', '<': '<', '=': '='}
+            if ath_highest_operator in operator_map:
+                conditions.append(f"ath_highest_pct {operator_map[ath_highest_operator]} ${param_idx}")
+                params.append(ath_highest_value)
+                param_idx += 1
+
+        if ath_lowest_operator and ath_lowest_value is not None:
+            operator_map = {'>': '>', '<': '<', '=': '='}
+            if ath_lowest_operator in operator_map:
+                conditions.append(f"ath_lowest_pct {operator_map[ath_lowest_operator]} ${param_idx}")
+                params.append(ath_lowest_value)
+                param_idx += 1
+
+        if actual_change_operator and actual_change_value is not None:
+            operator_map = {'>': '>', '<': '<', '=': '='}
+            if actual_change_operator in operator_map:
+                conditions.append(f"actual_price_change_pct {operator_map[actual_change_operator]} ${param_idx}")
+                params.append(actual_change_value)
+                param_idx += 1
+
+        if alert_time_from:
+            conditions.append(f"prediction_timestamp >= ${param_idx}")
+            params.append(alert_time_from)
+            param_idx += 1
+
+        if alert_time_to:
+            conditions.append(f"prediction_timestamp <= ${param_idx}")
+            params.append(alert_time_to)
+            param_idx += 1
+
+        if evaluation_time_from:
+            conditions.append(f"evaluation_timestamp >= ${param_idx}")
+            params.append(evaluation_time_from)
+            param_idx += 1
+
+        if evaluation_time_to:
+            conditions.append(f"evaluation_timestamp <= ${param_idx}")
+            params.append(evaluation_time_to)
+            param_idx += 1
+
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
         
         # Hole Vorhersagen
@@ -1459,9 +1547,33 @@ async def get_model_predictions_endpoint(
         count_query = f"SELECT COUNT(*) FROM model_predictions {where_clause}"
         count_params = params[:-2]  # Ohne limit und offset
         total = await pool.fetchval(count_query, *count_params) if count_params else await pool.fetchval(count_query)
-        
+
+        # Hole Modell-Ziel-Informationen (falls active_model_id angegeben)
+        model_target = None
+        if active_model_id:
+            model_info = await pool.fetchrow("""
+                SELECT price_change_percent, target_direction, alert_threshold
+                FROM prediction_active_models
+                WHERE id = $1
+            """, active_model_id)
+
+            if model_info:
+                target_pct = model_info['price_change_percent']
+                direction = model_info['target_direction']
+
+                if target_pct:
+                    if direction == 'up':
+                        model_target = f'Mind. +{target_pct:.1f}% Preissteigerung'
+                    elif direction == 'down':
+                        model_target = f'Max. -{target_pct:.1f}% Preisreduktion'
+                    else:
+                        model_target = f'{target_pct:.1f}% ({direction})'
+                else:
+                    model_target = 'Kein Ziel definiert'
+
         return {
             "predictions": [dict(row) for row in rows],
+            "model_target": model_target,
             "total": total,
             "limit": limit,
             "offset": offset

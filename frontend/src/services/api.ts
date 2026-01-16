@@ -284,17 +284,34 @@ export const modelPredictionsApi = {
     limit: number = 100,
     offset: number = 0,
     filters?: {
+      // Alte Filter (für Kompatibilität)
       tag?: 'negativ' | 'positiv' | 'alert';
       status?: 'aktiv' | 'inaktiv';
       coinId?: string;
+      // Neue erweiterte Filter
+      probabilityOperator?: '>' | '<' | '=';
+      probabilityValue?: number;
+      predictionStatuses?: ('negativ' | 'positiv' | 'alert')[];
+      evaluationStatuses?: ('success' | 'failed' | 'wait')[];
+      athHighestOperator?: '>' | '<' | '=';
+      athHighestValue?: number;
+      athLowestOperator?: '>' | '<' | '=';
+      athLowestValue?: number;
+      actualChangeOperator?: '>' | '<' | '=';
+      actualChangeValue?: number;
+      alertTimeFrom?: string;
+      alertTimeTo?: string;
+      evaluationTimeFrom?: string;
+      evaluationTimeTo?: string;
     }
-  ): Promise<{ predictions: any[]; total: number; limit: number; offset: number }> => {
+  ): Promise<{ predictions: any[]; model_target?: string; total: number; limit: number; offset: number }> => {
     const params = new URLSearchParams({
       active_model_id: activeModelId.toString(),
       limit: limit.toString(),
       offset: offset.toString()
     });
 
+    // Alte Filter (für Kompatibilität)
     if (filters?.tag) {
       params.append('tag', filters.tag);
     }
@@ -303,6 +320,46 @@ export const modelPredictionsApi = {
     }
     if (filters?.coinId) {
       params.append('coin_id', filters.coinId);
+    }
+
+    // Neue erweiterte Filter
+    if (filters?.probabilityOperator && filters.probabilityValue !== undefined) {
+      params.append('probability_operator', filters.probabilityOperator);
+      params.append('probability_value', filters.probabilityValue.toString());
+    }
+    if (filters?.predictionStatuses && filters.predictionStatuses.length > 0) {
+      filters.predictionStatuses.forEach(status => {
+        params.append('prediction_statuses', status);
+      });
+    }
+    if (filters?.evaluationStatuses && filters.evaluationStatuses.length > 0) {
+      filters.evaluationStatuses.forEach(status => {
+        params.append('evaluation_statuses', status);
+      });
+    }
+    if (filters?.athHighestOperator && filters.athHighestValue !== undefined) {
+      params.append('ath_highest_operator', filters.athHighestOperator);
+      params.append('ath_highest_value', filters.athHighestValue.toString());
+    }
+    if (filters?.athLowestOperator && filters.athLowestValue !== undefined) {
+      params.append('ath_lowest_operator', filters.athLowestOperator);
+      params.append('ath_lowest_value', filters.athLowestValue.toString());
+    }
+    if (filters?.actualChangeOperator && filters.actualChangeValue !== undefined) {
+      params.append('actual_change_operator', filters.actualChangeOperator);
+      params.append('actual_change_value', filters.actualChangeValue.toString());
+    }
+    if (filters?.alertTimeFrom) {
+      params.append('alert_time_from', filters.alertTimeFrom);
+    }
+    if (filters?.alertTimeTo) {
+      params.append('alert_time_to', filters.alertTimeTo);
+    }
+    if (filters?.evaluationTimeFrom) {
+      params.append('evaluation_time_from', filters.evaluationTimeFrom);
+    }
+    if (filters?.evaluationTimeTo) {
+      params.append('evaluation_time_to', filters.evaluationTimeTo);
     }
 
     const response = await apiClient.get(`/model-predictions?${params.toString()}`);
