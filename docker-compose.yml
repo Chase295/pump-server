@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DB_DSN=${DB_DSN}
+      - TRAINING_SERVICE_API_URL=${TRAINING_SERVICE_API_URL}
+      - MODEL_STORAGE_PATH=/app/models
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./tmp:/tmp/models
+      - ./config:/app/config # Mount für persistente Konfiguration
+    # Coolify: Ports werden über Reverse Proxy verwaltet
+    # Für lokale Entwicklung siehe docker-compose.local.yml
+    expose:
+      - "8000"
+    # Health-Check für Coolify (robuster mit wget als Fallback)
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/api/health || curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Coolify Labels für Health-Check
+    labels:
+      - "coolify.healthcheck.path=/api/health"
+      - "coolify.healthcheck.interval=30"
+      - "coolify.healthcheck.timeout=10"
+    networks:
+      - ml-prediction-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    # Port 3003 für externen Zugriff (auch in Coolify)
+    ports:
+      - "3003:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Health-Check für Frontend
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || curl -f http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ml-prediction-network
+
+networks:
+  ml-prediction-network:
+    driver: bridge
