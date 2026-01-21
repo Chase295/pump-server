@@ -28,17 +28,21 @@ const getApiBaseUrl = () => {
   if (import.meta.env.REACT_APP_API_URL) {
     return import.meta.env.REACT_APP_API_URL;
   }
-  
+
   // Wenn im Browser, verwende die aktuelle Domain
   if (typeof window !== 'undefined') {
     // Wenn auf test.local.chase295.de, verwende diese Domain
     if (window.location.origin.includes('test.local.chase295.de')) {
       return `${window.location.origin}/api`;
     }
+    // Für lokale Entwicklung: Immer relative URL verwenden
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api';
+    }
     // Sonst verwende relative URL (funktioniert, wenn Frontend und API auf derselben Domain sind)
     return '/api';
   }
-  
+
   // Fallback für SSR oder Tests
   return 'http://localhost:3000/api';
 };

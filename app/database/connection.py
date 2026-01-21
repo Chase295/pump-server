@@ -38,8 +38,8 @@ async def get_pool() -> asyncpg.Pool:
             # SSL basierend auf der URL entscheiden
             import ssl as ssl_module
             
-            if 'localhost' in DB_DSN or 'db:' in DB_DSN:
-                # Lokale DB - kein SSL
+            if 'localhost' in DB_DSN or 'db:' in DB_DSN or 'komodo.chase295.lo' in DB_DSN:
+                # Lokale DB oder spezifische Datenbank - kein SSL
                 ssl_config = False
             else:
                 # Externe DB - SSL mit selbstsignierten Zertifikaten erlauben

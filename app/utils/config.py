@@ -53,8 +53,10 @@ def ensure_config_file_exists():
         # Erstelle Verzeichnis falls nicht vorhanden
         os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
         # Default-Konfiguration (hardcoded, nicht aus load_persistent_config)
+        # Verwende lokale Datenbank falls DB_DSN gesetzt ist, sonst Produktions-DB
+        db_url = os.getenv("DB_DSN", "postgresql://postgres:9HVxi6hN6j7xpmqUx84o@100.118.155.75:5432/beta")
         default_config = {
-            "database_url": "postgresql://postgres:9HVxi6hN6j7xpmqUx84o@100.118.155.75:5432/beta",
+            "database_url": db_url,
             "training_service_url": "https://pump-training.local.chase295.de/api",
             "n8n_webhook_url": "",
             "api_port": 8000,
@@ -76,15 +78,15 @@ __all__ = ['load_persistent_config', 'save_persistent_config', 'ensure_config_fi
 # ============================================================
 # Datenbank (EXTERNE DB!)
 # ============================================================
-# Priorität: Persistente Config > Environment Variable > Default
-# WICHTIG: Persistente Config hat Vorrang, damit UI-Änderungen wirksam werden
-_persistent_db_url = _persistent_config.get("database_url")
-if _persistent_db_url:
-    DB_DSN = _persistent_db_url
+# Priorität: Environment Variable > Persistente Config > Default
+# WICHTIG: Environment Variable hat Vorrang für lokale Entwicklung
+_env_db_url = os.getenv("DB_DSN") or os.getenv("DATABASE_URL")
+if _env_db_url:
+    DB_DSN = _env_db_url
 else:
-    # Fallback: Environment Variable oder Default
-    DB_DSN = os.getenv("DB_DSN") or os.getenv("DATABASE_URL",
-              "postgresql://user:password@db:5432/ml_predictions")
+    # Fallback: Persistente Config oder Default
+    _persistent_db_url = _persistent_config.get("database_url")
+    DB_DSN = _persistent_db_url or "postgresql://user:password@db:5432/ml_predictions"
 
 # ============================================================
 # Ports

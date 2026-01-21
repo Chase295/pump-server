@@ -9,7 +9,7 @@ services:
     container_name: ml-prediction-service-backend
     restart: unless-stopped
     environment:
-      - DB_DSN=${DB_DSN}
+      - DB_DSN=postgresql://postgres:yc58TlS4Cz1j%26HHoy%25Oa@komodo.chase295.lo:5432/crypto_db
       - TRAINING_SERVICE_API_URL=${TRAINING_SERVICE_API_URL}
       - MODEL_STORAGE_PATH=/app/models
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
@@ -19,13 +19,13 @@ services:
       - ./tmp:/tmp/models
       - ./config:/app/config
     ports:
-      - "8000:8000"  # Direkter Zugriff auf Backend-API
+      - "8001:8000"  # Direkter Zugriff auf Backend-API (Port 8001 für lokale Entwicklung)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 10s
     networks:
       - ml-prediction-network
 
@@ -37,9 +37,6 @@ services:
     restart: unless-stopped
     ports:
       - "3003:3000"  # Direkter Zugriff auf Frontend
-    depends_on:
-      backend:
-        condition: service_healthy
     networks:
       - ml-prediction-network
 
