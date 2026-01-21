@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      - DB_DSN=${DB_DSN}
-      - TRAINING_SERVICE_API_URL=${TRAINING_SERVICE_API_URL}
+      - DB_DSN=postgresql://postgres:yc58TlS4Cz1j%26HHoy%25Oa@komodo.chase295.lo:5432/crypto_db
+      - TRAINING_SERVICE_API_URL=https://pump-training.local.chase295.de/api
       - MODEL_STORAGE_PATH=/app/models
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}
     volumes:
@@ -18,13 +18,13 @@ services:
     # Für lokale Entwicklung siehe docker-compose.local.yml
     expose:
       - "8000"
-    # Health-Check für Coolify (robuster mit wget als Fallback)
+    # Health-Check für Coolify (nur Server-Verfügbarkeit prüfen)
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/api/health || curl -f http://localhost:8000/api/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 40s
     # Coolify Labels für Health-Check
     labels:
       - "coolify.healthcheck.path=/api/health"
@@ -41,9 +41,7 @@ services:
     # Port 3003 für externen Zugriff (auch in Coolify)
     ports:
       - "3003:3000"
-    depends_on:
-      backend:
-        condition: service_healthy
+    # depends_on entfernt für bessere Start-Reihenfolge
     # Health-Check für Frontend
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || curl -f http://localhost:3000 || exit 1"]
