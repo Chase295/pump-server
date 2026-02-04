@@ -45,7 +45,7 @@ RUN echo 'server {\
     \
     # API-Proxy - alle /api/* Anfragen gehen an Backend\
     location /api/ {\
-        proxy_pass http://pump-server-backend:8000/api/;\
+        proxy_pass http://backend:8000/api/;\
         proxy_set_header Host $host;\
         proxy_set_header X-Real-IP $remote_addr;\
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
@@ -54,7 +54,7 @@ RUN echo 'server {\
     \
     # MCP-Proxy - alle /mcp/* Anfragen gehen an Backend (für Claude Code)\
     location /mcp/ {\
-        proxy_pass http://pump-server-backend:8000/mcp/;\
+        proxy_pass http://backend:8000/mcp/;\
         proxy_set_header Host $host;\
         proxy_set_header X-Real-IP $remote_addr;\
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
