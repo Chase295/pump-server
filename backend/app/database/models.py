@@ -135,6 +135,8 @@ async def get_available_models() -> List[Dict[str, Any]]:
                     'params': params,  # JSONB Object → Python Dict
                     'training_accuracy': float(model['training_accuracy']) if model.get('training_accuracy') else None,
                     'training_f1': float(model['training_f1']) if model.get('training_f1') else None,
+                    'training_precision': float(model['training_precision']) if model.get('training_precision') else None,
+                    'training_recall': float(model['training_recall']) if model.get('training_recall') else None,
                     'created_at': model.get('created_at')
                 })
         

@@ -129,6 +129,8 @@ async def get_available_models_endpoint():
                 phases=m['phases'],
                 training_accuracy=m['training_accuracy'],
                 training_f1=m['training_f1'],
+                training_precision=m.get('training_precision'),
+                training_recall=m.get('training_recall'),
                 created_at=m['created_at']
             )
             for m in models
@@ -170,6 +172,8 @@ async def get_available_model_details_endpoint(model_id: int):
             phases=model.get('phases'),
             training_accuracy=model.get('training_accuracy'),
             training_f1=model.get('training_f1'),
+            training_precision=model.get('training_precision'),
+            training_recall=model.get('training_recall'),
             created_at=model.get('created_at')
         )
     except HTTPException:

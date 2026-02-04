@@ -962,6 +962,7 @@ async def get_coin_evaluations_for_model(
     try:
         # WICHTIG: Hole auch aus model_predictions (neue Tabelle)!
         # UNION ALL um beide Quellen zu kombinieren
+        # FIX: Spalten-Reihenfolge muss in beiden SELECTs identisch sein!
         rows = await pool.fetch("""
             SELECT
                 ae.id,
@@ -979,9 +980,10 @@ async def get_coin_evaluations_for_model(
               AND p.data_timestamp >= $3
               AND p.data_timestamp <= $4
             UNION ALL
-            SELECT 
+            SELECT
                 mp.id,
-                mp.evaluation_timestamp,
+                mp.prediction_timestamp as alert_timestamp,
+                mp.evaluated_at as evaluation_timestamp,
                 mp.evaluation_result as status,
                 mp.actual_price_change_pct as actual_price_change,
                 pam.price_change_percent as expected_price_change,
@@ -993,8 +995,8 @@ async def get_coin_evaluations_for_model(
               AND mp.active_model_id = $2
               AND mp.prediction_timestamp >= $3
               AND mp.prediction_timestamp <= $4
-              AND mp.status = 'inaktiv'  -- Nur ausgewertete Predictions
-            ORDER BY mp.prediction_timestamp ASC, mp.evaluation_timestamp ASC NULLS LAST
+              AND mp.evaluation_result IS NOT NULL
+            ORDER BY prediction_timestamp ASC, evaluation_timestamp ASC NULLS LAST
         """, coin_id, active_model_id, start_timestamp, end_timestamp)
         
         return [

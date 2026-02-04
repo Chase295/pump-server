@@ -143,15 +143,17 @@ class AvailableModel(BaseModel):
     name: str
     model_type: str
     target_variable: str
-    target_operator: Optional[str]
-    target_value: Optional[float]
-    future_minutes: Optional[int]
-    price_change_percent: Optional[float]
-    target_direction: Optional[str]
+    target_operator: Optional[str] = None
+    target_value: Optional[float] = None
+    future_minutes: Optional[int] = None
+    price_change_percent: Optional[float] = None
+    target_direction: Optional[str] = None
     features: List[str]
-    phases: Optional[List[int]]
-    training_accuracy: Optional[float]
-    training_f1: Optional[float]
+    phases: Optional[List[int]] = None
+    training_accuracy: Optional[float] = None
+    training_f1: Optional[float] = None
+    training_precision: Optional[float] = None
+    training_recall: Optional[float] = None
     created_at: datetime
 
 
