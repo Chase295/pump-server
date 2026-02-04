@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_comment": "MCP Server Konfiguration für pump-server - Kopiere diese Datei nach ~/.claude/mcp_servers.json",
+
+  "mcpServers": {
+    "pump-server": {
+      "transport": "sse",
+      "url": "http://localhost:3003/mcp/sse",
+      "name": "Pump Server ML Predictions",
+      "description": "ML Prediction Service für Kryptowährungs-Vorhersagen mit trainierten Machine Learning Modellen",
+
+      "_tools_available": [
+        "list_active_models - Liste aktiver ML-Modelle",
+        "list_available_models - Verfügbare Modelle zum Import",
+        "import_model - Modell vom Training-Service importieren",
+        "get_model_details - Detaillierte Modell-Informationen",
+        "activate_model - Pausiertes Modell aktivieren",
+        "deactivate_model - Aktives Modell pausieren",
+        "predict_coin - ML-Vorhersage für einen Coin",
+        "get_predictions - Historische Vorhersagen abrufen",
+        "get_latest_prediction - Neueste Vorhersage für Coin",
+        "update_alert_config - Alert-Konfiguration ändern",
+        "get_model_statistics - Modell-Statistiken",
+        "health_check - Service Health-Status",
+        "get_stats - Umfassende Service-Statistiken"
+      ],
+
+      "_endpoints": {
+        "info": "http://localhost:3003/mcp/info",
+        "health": "http://localhost:3003/mcp/health",
+        "sse": "http://localhost:3003/mcp/sse"
+      },
+
+      "_setup_instructions": [
+        "1. Stelle sicher dass pump-server läuft: docker-compose up -d",
+        "2. Teste Verbindung: curl http://localhost:3003/mcp/info",
+        "3. Kopiere diese Datei nach ~/.claude/mcp_servers.json",
+        "4. Starte Claude Code neu",
+        "5. Der MCP Server erscheint in der Tool-Liste"
+      ]
+    }
+  }
+}
