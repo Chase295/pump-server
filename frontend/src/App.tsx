@@ -149,7 +149,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       height: '100vh',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)',
       color: 'white',
-      overflow: 'auto'
+      overflow: 'auto',
     }}>
       {/* Mobile Drawer */}
       {isMobile ? (
