@@ -1,6 +1,6 @@
 # Pump Server - Entwicklerdokumentation
 
-ML Prediction Service für Kryptowährungs-Vorhersagen mit trainiereten Machine Learning Modellen.
+Pump Server für Kryptowährungs-Vorhersagen mit trainiereten Machine Learning Modellen.
 
 ## Quick Start
 

@@ -31,7 +31,7 @@ services:
       - "coolify.healthcheck.interval=30"
       - "coolify.healthcheck.timeout=10"
     networks:
-      - ml-prediction-network
+      - pump-server-network
 
   frontend:
     build:
@@ -50,8 +50,8 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - ml-prediction-network
+      - pump-server-network
 
 networks:
-  ml-prediction-network:
+  pump-server-network:
     driver: bridge

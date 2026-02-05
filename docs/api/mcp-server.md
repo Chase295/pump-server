@@ -1,6 +1,6 @@
 # MCP Server Integration
 
-Der pump-server bietet einen integrierten MCP (Model Context Protocol) Server, der es KI-Clients wie Claude Code, Cursor, oder anderen MCP-kompatiblen Anwendungen ermöglicht, direkt mit dem ML Prediction Service zu interagieren.
+Der pump-server bietet einen integrierten MCP (Model Context Protocol) Server, der es KI-Clients wie Claude Code, Cursor, oder anderen MCP-kompatiblen Anwendungen ermöglicht, direkt mit dem Pump Server zu interagieren.
 
 ---
 
@@ -40,7 +40,7 @@ Erstelle oder erweitere die Datei `~/.claude/mcp_servers.json`:
       "transport": "sse",
       "url": "http://localhost:3003/mcp/sse",
       "name": "Pump Server ML Predictions",
-      "description": "ML Prediction Service für Kryptowährungs-Vorhersagen"
+      "description": "Pump Server für Kryptowährungs-Vorhersagen"
     }
   }
 }
@@ -67,7 +67,7 @@ Nach dem Speichern der Konfiguration Claude Code neu starten. Der MCP Server ers
 {
   "name": "pump-server-mcp",
   "version": "1.0.0",
-  "description": "MCP Server for Pump-Server ML Prediction Service",
+  "description": "MCP Server for Pump-Server Pump Server",
   "transport": "sse",
   "sse_endpoint": "/mcp/sse",
   "messages_endpoint": "/mcp/messages/",

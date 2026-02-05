@@ -1,5 +1,5 @@
 """
-Streamlit UI für ML Prediction Service
+Streamlit UI für Pump Server
 Web-Interface für Modell-Management mit Tab-basiertem Layout
 REFACTORED VERSION - Aufgeteilt in Module
 """
@@ -11,7 +11,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api")
 
 # Page Config
 st.set_page_config(
-    page_title="ML Prediction Service - Control Panel",
+    page_title="Pump Server - Control Panel",
     page_icon="🔮",
     layout="wide"
 )
@@ -59,7 +59,7 @@ def get_page_alert_config():
 
 def main():
     """Hauptfunktion mit Tab-basiertem Layout"""
-    st.title("🔮 ML Prediction Service - Control Panel")
+    st.title("🔮 Pump Server - Control Panel")
 
     # Tabs Navigation
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([

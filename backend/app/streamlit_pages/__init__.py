@@ -1,4 +1,4 @@
 """
 Streamlit Pages Module
-Modulare Seiten für die ML Prediction Service Web-UI
+Modulare Seiten für die Pump Server Web-UI
 """

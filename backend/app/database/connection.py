@@ -1,5 +1,5 @@
 """
-Datenbank-Verbindungsmanagement für ML Prediction Service
+Datenbank-Verbindungsmanagement für Pump Server
 
 Verwaltet den asyncpg Connection Pool für PostgreSQL-Verbindungen.
 Die Datenbank ist EXTERN und wird über DB_DSN konfiguriert.

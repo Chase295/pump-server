@@ -83,7 +83,7 @@ async def mcp_info() -> dict[str, Any]:
     return {
         "name": "pump-server-mcp",
         "version": "1.0.0",
-        "description": "MCP Server for Pump-Server ML Prediction Service",
+        "description": "MCP Server for Pump-Server Pump Server",
         "transport": "sse",
         "sse_endpoint": "/mcp/sse",
         "messages_endpoint": "/mcp/messages/",

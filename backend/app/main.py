@@ -1,5 +1,5 @@
 """
-FastAPI Main App für ML Prediction Service
+FastAPI Main App für Pump Server
 """
 import asyncio
 import time
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 # FastAPI App erstellen
 app = FastAPI(
-    title="ML Prediction Service",
+    title="Pump Server",
     description="Machine Learning Prediction Service für Coin-Bot",
     version="1.0.0"
 )
@@ -68,7 +68,7 @@ for route in get_sse_routes():
 @app.on_event("startup")
 async def startup():
     """Startup Event: Einfacher Start ohne DB-Initialisierung"""
-    logger.info("🚀 Starte ML Prediction Service...")
+    logger.info("🚀 Starte Pump Server...")
 
     # DB-Pool wird lazy geladen (beim ersten API-Call)
     logger.info("ℹ️ Datenbank-Verbindung wird lazy geladen (beim ersten API-Call)")
@@ -90,7 +90,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     """Shutdown Event: Cleanup"""
-    logger.info("🛑 Stoppe ML Prediction Service...")
+    logger.info("🛑 Stoppe Pump Server...")
 
     # Hier könnte man den Event-Handler stoppen, falls nötig
     logger.info("✅ Service gestoppt")

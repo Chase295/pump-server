@@ -1,5 +1,5 @@
 """
-Prometheus Metrics und Health Status für ML Prediction Service
+Prometheus Metrics und Health Status für Pump Server
 """
 import time
 from typing import Dict, Any

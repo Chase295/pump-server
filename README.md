@@ -1,4 +1,4 @@
-# 🚀 ML Prediction Service
+# 🚀 Pump Server
 
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://python.org)
@@ -28,7 +28,7 @@ Dieser Service:
 ### Lokales Testing
 
 ```bash
-cd ml-prediction-service
+cd pump-server
 
 # Container bauen und starten
 docker-compose up -d

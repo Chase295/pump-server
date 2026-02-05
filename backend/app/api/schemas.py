@@ -1,5 +1,5 @@
 """
-Pydantic Schemas für ML Prediction Service API
+Pydantic Schemas für Pump Server API
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime

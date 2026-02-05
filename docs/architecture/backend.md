@@ -79,7 +79,7 @@ backend/
 # Wichtige Komponenten:
 
 # 1. App-Initialisierung
-app = FastAPI(title="ML Prediction Service")
+app = FastAPI(title="Pump Server")
 
 # 2. Middleware
 app.add_middleware(RequestIDMiddleware)  # Request Tracing

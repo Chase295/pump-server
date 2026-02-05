@@ -1,5 +1,5 @@
 /**
- * Haupt-Applikation - ML Prediction Service
+ * Haupt-Applikation - Pump Server
  * Moderne UI mit Gradient-Design und Drawer-Navigation
  */
 import React from 'react';
@@ -81,7 +81,7 @@ const theme = createTheme({
   },
 });
 
-// Navigation Items für ML Prediction Service
+// Navigation Items für Pump Server
 const navItems = [
   { path: '/overview', label: 'Übersicht', icon: <DashboardIcon /> },
   { path: '/model-import', label: 'Modell Import', icon: <TrainingIcon /> },
@@ -100,7 +100,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const drawerContent = (
     <Box sx={{ width: 250, pt: 2 }}>
       <Typography variant="h6" sx={{ px: 2, pb: 1, fontWeight: 'bold', color: '#00d4ff' }}>
-        🤖 ML Prediction Service
+        🤖 Pump Server
       </Typography>
       <List>
         {navItems.map((item) => (
@@ -221,7 +221,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </IconButton>
             )}
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: '#00d4ff' }}>
-              🤖 ML Prediction Service Management
+              🤖 Pump Server Management
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.7 }}>
               v1.0.0

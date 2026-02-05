@@ -1,5 +1,5 @@
 """
-Zentrale Konfiguration für ML Prediction Service
+Zentrale Konfiguration für Pump Server
 
 Liest alle Environment Variables und stellt Default-Werte bereit.
 Unterstützt persistente UI-Konfiguration über Shared Volume.

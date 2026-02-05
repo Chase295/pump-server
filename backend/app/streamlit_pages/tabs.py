@@ -216,7 +216,7 @@ def tab_configuration():
                         # Kein automatisches Rerun - User kann manuell aktualisieren
                     else:
                         st.error(message)
-                        st.info("💡 Du kannst den Service auch manuell neu starten: `docker compose restart ml-prediction-service`")
+                        st.info("💡 Du kannst den Service auch manuell neu starten: `docker compose restart pump-server`")
 
     # Info nach Speichern (ohne Auto-Rerun)
     if st.session_state.get("config_just_saved", False):
@@ -400,7 +400,7 @@ def tab_info():
     # Projekt-Übersicht
     st.header("📋 Was macht dieses Projekt?")
     st.markdown("""
-    **ML Prediction Service** ist ein Machine-Learning-Service für die Verwaltung und Nutzung trainierter KI-Modelle.
+    **Pump Server** ist ein Machine-Learning-Service für die Verwaltung und Nutzung trainierter KI-Modelle.
 
     Das System:
     - ✅ Verwaltet trainierte ML-Modelle (Random Forest, XGBoost)
@@ -422,7 +422,7 @@ def tab_info():
             ├─ trainierte Modelle (.pkl Dateien)
             └─ Modell-Metadaten
             ↓
-    ML Prediction Service
+    Pump Server
             ├─ API-Endpunkte (/api/models, /api/predict, etc.)
             ├─ Vorhersage-Engine
             ├─ Alert-System

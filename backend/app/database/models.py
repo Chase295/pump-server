@@ -1,5 +1,5 @@
 """
-Datenbank-Modelle für ML Prediction Service
+Datenbank-Modelle für Pump Server
 
 CRUD-Operationen für:
 - prediction_active_models (aktive Modelle im Prediction Service)

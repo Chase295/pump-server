@@ -1,5 +1,5 @@
 """
-Alert-Evaluations Funktionen für ML Prediction Service
+Alert-Evaluations Funktionen für Pump Server
 
 Erweiterte Funktionen für Alert-Management:
 - Alert-Auswertung (Hintergrund-Job)

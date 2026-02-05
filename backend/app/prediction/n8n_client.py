@@ -1,5 +1,5 @@
 """
-n8n Webhook Client für ML Prediction Service
+n8n Webhook Client für Pump Server
 
 Sendet Vorhersagen an n8n mit vollständigen Modell-Informationen.
 """
@@ -179,7 +179,7 @@ async def send_to_n8n(
             "metadata": {
                 "total_predictions": len(enriched_predictions),
                 "alerts_count": sum(1 for p in enriched_predictions if p['is_alert']),
-                "service": "ml-prediction-service",
+                "service": "pump-server",
                 "version": "1.0.0"
             }
         }

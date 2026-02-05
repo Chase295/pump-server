@@ -1,5 +1,5 @@
 """
-Modell-Manager für ML Prediction Service
+Modell-Manager für Pump Server
 
 Verwaltet Modell-Laden, Caching und Download vom Training Service.
 """

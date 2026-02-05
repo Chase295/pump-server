@@ -1,5 +1,5 @@
 """
-Event-Handler für ML Prediction Service
+Event-Handler für Pump Server
 
 Überwacht coin_metrics für neue Einträge und macht automatisch Vorhersagen.
 Unterstützt LISTEN/NOTIFY (Echtzeit) und Polling-Fallback.

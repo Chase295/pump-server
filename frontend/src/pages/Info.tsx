@@ -1,5 +1,5 @@
 /**
- * Info-Seite - Vollständige Dokumentation des ML Prediction Service
+ * Info-Seite - Vollständige Dokumentation des Pump Server
  * Mit aufklappbaren Kapiteln für bessere Übersicht und Mobile-Optimierung
  */
 import React, { useState, SyntheticEvent } from 'react';
@@ -142,7 +142,7 @@ const Info: React.FC = () => {
               fontSize: { xs: '1.75rem', sm: '2.25rem', md: '3rem' }
             }}
           >
-            ML Prediction Service
+            Pump Server
           </Typography>
           <Typography
             variant="h5"
@@ -213,7 +213,7 @@ const Info: React.FC = () => {
           onChange={handleChapterChange('chapter-system')}
         >
           <Typography variant="body1" sx={{ mb: 2 }}>
-            Der ML Prediction Service ist ein Echtzeit-Vorhersage-System für Pump-Detection auf der Solana-Blockchain.
+            Der Pump Server ist ein Echtzeit-Vorhersage-System für Pump-Detection auf der Solana-Blockchain.
             Er analysiert Kryptowährungs-Daten (Coins) in Echtzeit und sagt voraus, ob ein Coin in den nächsten X Minuten
             um Y% steigen (Pump) oder fallen (Rug) wird.
           </Typography>

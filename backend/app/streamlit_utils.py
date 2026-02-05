@@ -1,7 +1,7 @@
 """
 Streamlit Utility Functions
 Hilfsfunktionen für API-Calls, Konfiguration und gemeinsame Operationen
-Für ML Prediction Service
+Für Pump Server
 """
 import streamlit as st
 import os
@@ -228,7 +228,7 @@ def restart_service() -> tuple[bool, str]:
         # Fallback: Docker Compose verwenden
         try:
             result = subprocess.run(
-                ["docker", "compose", "restart", "ml-prediction-service"],
+                ["docker", "compose", "restart", "pump-server"],
                 capture_output=True,
                 text=True,
                 cwd="/app"
@@ -253,7 +253,7 @@ def get_service_logs(lines: int = 100) -> str:
     # Fallback: Docker Logs verwenden
     try:
         result = subprocess.run(
-            ["docker", "logs", "--tail", str(lines), "ml-prediction-service"],
+            ["docker", "logs", "--tail", str(lines), "pump-server"],
             capture_output=True,
             text=True,
             cwd="/app"

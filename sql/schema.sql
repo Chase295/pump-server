@@ -1,5 +1,5 @@
 -- ============================================================
--- ML Prediction Service - Datenbank-Schema
+-- Pump Server - Datenbank-Schema
 -- Version: 1.0
 -- SEPARATE Tabellen-Struktur (keine Änderungen an ml_models!)
 -- ============================================================

@@ -1,4 +1,4 @@
-# 📊 ML Prediction Service - Datenbank-Schema Dokumentation
+# 📊 Pump Server - Datenbank-Schema Dokumentation
 
 **Version:** 1.0  
 **Datum:** 2025-01-XX  
@@ -8,7 +8,7 @@
 
 ## 📋 Übersicht
 
-Dieses Schema erweitert die bestehende `crypto` Datenbank um Tabellen für den ML Prediction Service. **Wichtig:** Es werden **KEINE** bestehenden Tabellen geändert, nur neue Tabellen hinzugefügt.
+Dieses Schema erweitert die bestehende `crypto` Datenbank um Tabellen für den Pump Server. **Wichtig:** Es werden **KEINE** bestehenden Tabellen geändert, nur neue Tabellen hinzugefügt.
 
 ### Neue Tabellen:
 1. `prediction_active_models` - Verwaltung aktiver Modelle im Prediction Service
@@ -24,7 +24,7 @@ Dieses Schema erweitert die bestehende `crypto` Datenbank um Tabellen für den M
 
 ### Was macht der Trigger?
 
-Der Trigger **überwacht automatisch** alle neuen Einträge in der `coin_metrics` Tabelle und sendet eine **Echtzeit-Benachrichtigung** an den ML Prediction Service.
+Der Trigger **überwacht automatisch** alle neuen Einträge in der `coin_metrics` Tabelle und sendet eine **Echtzeit-Benachrichtigung** an den Pump Server.
 
 ### Funktionsweise:
 

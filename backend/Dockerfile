@@ -1,4 +1,4 @@
-# ML Prediction Service Dockerfile
+# Pump Server Dockerfile
 # Python 3.11-slim mit FastAPI
 FROM python:3.11-slim
 

@@ -1,5 +1,5 @@
 """
-FastAPI Routes für ML Prediction Service
+FastAPI Routes für Pump Server
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
@@ -90,7 +90,7 @@ def _parse_send_mode_for_response(value: Any) -> List[str]:
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api", tags=["ML Prediction Service"])
+router = APIRouter(prefix="/api", tags=["Pump Server"])
 
 # ============================================================
 # Dependency: DB Pool
@@ -1294,7 +1294,7 @@ async def logs_endpoint(tail: int = 100):
         # Versuche Docker-Logs zu lesen (funktioniert wenn Docker verfügbar ist)
         try:
             # Prüfe ob wir im Container sind (HOSTNAME ist gesetzt)
-            container_name = os.getenv("HOSTNAME", "ml-prediction-service")
+            container_name = os.getenv("HOSTNAME", "pump-server")
             
             # Prüfe ob Docker verfügbar ist
             docker_check = subprocess.run(
@@ -1353,7 +1353,7 @@ async def logs_endpoint(tail: int = 100):
         # Letzter Fallback: Info-Message
         return Response(
             content=f"ℹ️ Keine Logs verfügbar.\n\n"
-                   f"💡 Tipp: Logs können direkt mit `docker logs ml-prediction-service --tail {tail}` angezeigt werden.\n"
+                   f"💡 Tipp: Logs können direkt mit `docker logs pump-server --tail {tail}` angezeigt werden.\n"
                    f"💡 Oder: Logs werden über stdout/stderr ausgegeben und sind im Docker-Container sichtbar.\n",
             media_type="text/plain"
         )

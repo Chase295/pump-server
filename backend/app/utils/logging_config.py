@@ -1,5 +1,5 @@
 """
-Strukturiertes Logging für ML Prediction Service
+Strukturiertes Logging für Pump Server
 
 Features:
 - JSON-Logging (optional)

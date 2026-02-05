@@ -7,7 +7,7 @@
       "transport": "sse",
       "url": "http://localhost:3003/mcp/sse",
       "name": "Pump Server ML Predictions",
-      "description": "ML Prediction Service für Kryptowährungs-Vorhersagen mit trainierten Machine Learning Modellen",
+      "description": "Pump Server für Kryptowährungs-Vorhersagen mit trainierten Machine Learning Modellen",
 
       "_tools_available": [
         "list_active_models - Liste aktiver ML-Modelle",
