@@ -548,54 +548,54 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
               sx={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 1.5
+                gap: { xs: 0.5, sm: 1.5 }
               }}
             >
-              <Box sx={{ textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 0.5 }}>
-                  <ShowChartIcon 
-                    fontSize="small" 
-                    sx={{ 
+              <Box sx={{ textAlign: 'center', overflow: 'hidden' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
+                  <ShowChartIcon
+                    sx={{
                       color: stats.totalPerformancePct >= 0 ? 'success.main' : 'error.main',
-                      fontSize: 20
-                    }} 
+                      fontSize: { xs: 16, sm: 20 },
+                      flexShrink: 0
+                    }}
                   />
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      fontWeight: 700, 
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
                       color: stats.totalPerformancePct >= 0 ? 'success.main' : 'error.main',
-                      fontSize: '1.1rem'
+                      fontSize: { xs: '0.85rem', sm: '1.1rem' },
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    {stats.totalPerformancePct >= 0 ? '+' : ''}{stats.totalPerformancePct.toFixed(2)}%
+                    {stats.totalPerformancePct >= 0 ? '+' : ''}{stats.totalPerformancePct.toFixed(1)}%
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' } }}>
                   Gesamt
                 </Typography>
               </Box>
 
-              <Box sx={{ textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 0.5 }}>
-                  <AttachMoneyIcon fontSize="small" sx={{ color: 'success.main', fontSize: 20 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main', fontSize: '1.1rem' }}>
-                    +{stats.alertsProfitPct.toFixed(2)}%
+              <Box sx={{ textAlign: 'center', overflow: 'hidden' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
+                  <AttachMoneyIcon sx={{ color: 'success.main', fontSize: { xs: 16, sm: 20 }, flexShrink: 0 }} />
+                  <Typography sx={{ fontWeight: 700, color: 'success.main', fontSize: { xs: '0.85rem', sm: '1.1rem' }, whiteSpace: 'nowrap' }}>
+                    +{stats.alertsProfitPct.toFixed(1)}%
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' } }}>
                   Gewinn
                 </Typography>
               </Box>
 
-              <Box sx={{ textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 0.5 }}>
-                  <TrendingDownIcon fontSize="small" sx={{ color: 'error.main', fontSize: 20 }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'error.main', fontSize: '1.1rem' }}>
-                    {stats.alertsLossPct.toFixed(2)}%
+              <Box sx={{ textAlign: 'center', overflow: 'hidden' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
+                  <TrendingDownIcon sx={{ color: 'error.main', fontSize: { xs: 16, sm: 20 }, flexShrink: 0 }} />
+                  <Typography sx={{ fontWeight: 700, color: 'error.main', fontSize: { xs: '0.85rem', sm: '1.1rem' }, whiteSpace: 'nowrap' }}>
+                    {stats.alertsLossPct.toFixed(1)}%
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6rem', sm: '0.7rem' } }}>
                   Verlust
                 </Typography>
               </Box>
