@@ -163,15 +163,16 @@ const ModelImport: React.FC = () => {
   };
 
   // Statistiken berechnen
+  // HINWEIS: Die API /api/models/available gibt nur nicht-importierte Modelle zurück
+  // Daher zeigen wir die Anzahl der bereits importierten Modelle aus activeModels
   const stats = React.useMemo(() => {
-    if (!availableModels) return { total: 0, ready: 0, imported: 0 };
-
-    const imported = availableModels.filter(m => isAlreadyImported(m.id)).length;
+    const available = availableModels?.length || 0;
+    const imported = activeModels?.length || 0;
 
     return {
-      total: availableModels.length,
-      ready: availableModels.length - imported,
-      imported: imported
+      total: available + imported, // Gesamt = Verfügbar + Bereits importiert
+      ready: available,            // Bereit = Verfügbare (nicht importierte)
+      imported: imported           // Bereits importiert = Aktive Modelle
     };
   }, [availableModels, activeModels]);
 
