@@ -1,6 +1,7 @@
 /**
  * ModelImport Page
  * Importiert neue ML-Modelle aus dem Training-Service
+ * Kachel-Ansicht (Card-Grid) für bessere Übersicht
  */
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,12 +12,6 @@ import {
   Card,
   CardContent,
   Alert,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Button,
   Chip,
   Dialog,
@@ -29,13 +24,13 @@ import {
 import {
   CloudDownload as ImportIcon,
   Info as InfoIcon,
-  Refresh as RefreshIcon,
-  Visibility as ViewIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 
 // Components
 import PageContainer from '../components/layout/PageContainer';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import AvailableModelCard from '../components/models/AvailableModelCard';
 
 // Services
 import { modelsApi } from '../services/api';
@@ -54,6 +49,8 @@ interface AvailableModel {
   phases?: number[] | null;
   training_accuracy?: number;
   training_f1?: number;
+  training_precision?: number;
+  training_recall?: number;
   created_at: string;
 }
 
@@ -78,7 +75,7 @@ const ModelImport: React.FC = () => {
   });
 
   // Verfügbare Modelle laden
-  const { data: availableModels, isLoading, error, refetch } = useQuery<AvailableModel[], Error>({
+  const { data: availableModels, isLoading, error, refetch, isRefetching } = useQuery<AvailableModel[], Error>({
     queryKey: ['available-models'],
     queryFn: modelsApi.getAvailable
   });
@@ -132,6 +129,10 @@ const ModelImport: React.FC = () => {
     setConfirmDialogOpen(true);
   };
 
+  const handleDetailsClick = (modelId: number) => {
+    navigate(`/model-import/${modelId}`);
+  };
+
   const handleConfirmImport = () => {
     if (selectedModel) {
       importMutation.mutate(selectedModel.id);
@@ -143,7 +144,7 @@ const ModelImport: React.FC = () => {
   };
 
   const isAlreadyImported = (modelId: number) => {
-    return activeModels?.some(model => model.model_id === modelId);
+    return activeModels?.some(model => model.model_id === modelId) || false;
   };
 
   const getModelTypeLabel = (type: string) => {
@@ -161,6 +162,19 @@ const ModelImport: React.FC = () => {
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Statistiken berechnen
+  const stats = React.useMemo(() => {
+    if (!availableModels) return { total: 0, ready: 0, imported: 0 };
+
+    const imported = availableModels.filter(m => isAlreadyImported(m.id)).length;
+
+    return {
+      total: availableModels.length,
+      ready: availableModels.length - imported,
+      imported: imported
+    };
+  }, [availableModels, activeModels]);
+
   if (isLoading) {
     return <LoadingSpinner message="Lade verfügbare Modelle..." />;
   }
@@ -171,201 +185,75 @@ const ModelImport: React.FC = () => {
         <Alert severity="error" sx={{ mb: 3 }}>
           Fehler beim Laden der verfügbaren Modelle: {error.message}
         </Alert>
+        <Button
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={() => refetch()}
+        >
+          Erneut versuchen
+        </Button>
       </PageContainer>
     );
   }
 
   const readyModels = availableModels || [];
-  const trainingModels: AvailableModel[] = []; // Keine Training-Modelle von der API
 
   return (
     <PageContainer>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
             📥 Modell-Import
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Importiere neue ML-Modelle aus dem Training-Service in dein Prediction-System
-          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            size="small"
+          >
+            {isRefetching ? 'Aktualisiere...' : 'Aktualisieren'}
+          </Button>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          Aktualisieren
-        </Button>
+
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Importiere neue ML-Modelle aus dem Training-Service in dein Prediction-System
+        </Typography>
+
+        {/* Statistiken */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+          <Chip
+            label={`${stats.total} Gesamt`}
+            color="primary"
+            variant="outlined"
+          />
+          <Chip
+            label={`${stats.ready} Bereit`}
+            color="success"
+            variant="filled"
+          />
+          <Chip
+            label={`${stats.imported} Bereits importiert`}
+            color="default"
+            variant="outlined"
+          />
+        </Box>
       </Box>
 
-      {/* Bereits importierte Modelle Info */}
-      {activeModels && activeModels.length > 0 && (
+      {/* Info Alert */}
+      {activeModels && activeModels.length > 0 && stats.imported > 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Du hast bereits {activeModels.length} Modell(e) importiert. Diese werden in der Übersicht nicht mehr angezeigt.
+          Du hast bereits {activeModels.length} Modell(e) importiert. Bereits importierte Modelle sind ausgegraut dargestellt.
         </Alert>
       )}
 
-      {/* Verfügbare Modelle */}
-      {readyModels.length > 0 && (
-        <Card sx={{ mb: 4 }}>
+      {/* Modelle Grid */}
+      {readyModels.length === 0 ? (
+        <Card sx={{ textAlign: 'center', py: 6 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-              ✅ Bereit zum Import ({readyModels.length})
-            </Typography>
-
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Typ</TableCell>
-                    <TableCell>Training Accuracy</TableCell>
-                    <TableCell>Training F1</TableCell>
-                    <TableCell>Features</TableCell>
-                    <TableCell>Ziel</TableCell>
-                    <TableCell>Aktion</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {readyModels.map((model) => (
-                    <TableRow key={model.id}>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {model.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            ID: {model.id}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getModelTypeLabel(model.model_type)}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {formatPercentage(model.training_accuracy)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {formatPercentage(model.training_f1)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={`${model.features.length} Features`}
-                          size="small"
-                          variant="outlined"
-                          color="info"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {model.target_direction?.toUpperCase()} {model.price_change_percent}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            in {model.future_minutes}min
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<ViewIcon />}
-                            onClick={() => navigate(`/model-import/${model.id}`)}
-                          >
-                            Details
-                          </Button>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<ImportIcon />}
-                            onClick={() => handleImportClick(model)}
-                            disabled={isAlreadyImported(model.id)}
-                          >
-                            {isAlreadyImported(model.id) ? 'Bereits importiert' : 'Importieren'}
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Training Modelle */}
-      {trainingModels.length > 0 && (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-              🔄 In Training ({trainingModels.length})
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Diese Modelle werden noch trainiert und sind noch nicht zum Import bereit.
-            </Typography>
-
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Typ</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Erstellt</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {trainingModels.map((model) => (
-                    <TableRow key={model.id}>
-                      <TableCell>{model.name}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getModelTypeLabel(model.model_type)}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label="Training"
-                          size="small"
-                          color="warning"
-                          icon={<InfoIcon />}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {new Date(model.created_at).toLocaleDateString('de-DE')}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Keine Modelle verfügbar */}
-      {readyModels.length === 0 && trainingModels.length === 0 && (
-        <Card>
-          <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <InfoIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary">
+            <Typography variant="h6" color="text.secondary" gutterBottom>
               Keine Modelle verfügbar
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -374,7 +262,38 @@ const ModelImport: React.FC = () => {
             </Typography>
           </CardContent>
         </Card>
+      ) : (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, 1fr)',
+              lg: 'repeat(3, 1fr)'
+            },
+            gap: 3
+          }}
+        >
+          {readyModels.map((model) => (
+            <AvailableModelCard
+              key={model.id}
+              model={model}
+              onDetailsClick={handleDetailsClick}
+              onImportClick={handleImportClick}
+              isAlreadyImported={isAlreadyImported(model.id)}
+              isImporting={importMutation.isPending && selectedModel?.id === model.id}
+            />
+          ))}
+        </Box>
       )}
+
+      {/* Footer Info */}
+      <Box sx={{ mt: 4, p: 2, backgroundColor: 'background.paper', borderRadius: 2 }}>
+        <Typography variant="body2" color="text.secondary" align="center">
+          Modelle werden vom Training-Service geladen •
+          Letzte Aktualisierung: {new Date().toLocaleTimeString()}
+        </Typography>
+      </Box>
 
       {/* Confirm Import Dialog */}
       <Dialog
@@ -398,10 +317,24 @@ const ModelImport: React.FC = () => {
                   Modell-Details:
                 </Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>Typ: {getModelTypeLabel(selectedModel.model_type)}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>Accuracy: {formatPercentage(selectedModel.training_accuracy)}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>Features: {selectedModel.features.length}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.primary' }}>Zeitfenster: {selectedModel.future_minutes}min</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    Typ: {getModelTypeLabel(selectedModel.model_type)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    Accuracy: {formatPercentage(selectedModel.training_accuracy)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    F1-Score: {formatPercentage(selectedModel.training_f1)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    Features: {selectedModel.features.length}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    Ziel: {selectedModel.target_direction?.toUpperCase()} {selectedModel.price_change_percent}%
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
+                    Zeitfenster: {selectedModel.future_minutes} min
+                  </Typography>
                 </Box>
               </Box>
 
@@ -421,6 +354,7 @@ const ModelImport: React.FC = () => {
           <Button
             onClick={handleConfirmImport}
             variant="contained"
+            color="success"
             disabled={importMutation.isPending}
             startIcon={importMutation.isPending ? <CircularProgress size={16} /> : <ImportIcon />}
           >
