@@ -342,13 +342,13 @@ async def get_active_models(include_inactive: bool = False) -> List[Dict[str, An
     if rows:
         active_model_ids = [row['id'] for row in rows]
         stats_rows = await pool.fetch("""
-            SELECT 
+            SELECT
                 active_model_id,
                 COUNT(*) as total_predictions,
-                COUNT(*) FILTER (WHERE prediction = 1) as positive_predictions,
-                COUNT(*) FILTER (WHERE prediction = 0) as negative_predictions,
+                COUNT(*) FILTER (WHERE tag = 'alert') as positive_predictions,
+                COUNT(*) FILTER (WHERE tag != 'alert') as negative_predictions,
                 AVG(probability) as avg_probability
-            FROM predictions
+            FROM model_predictions
             WHERE active_model_id = ANY($1::bigint[])
             GROUP BY active_model_id
         """, active_model_ids)
@@ -366,20 +366,12 @@ async def get_active_models(include_inactive: bool = False) -> List[Dict[str, An
         
         # Hole Alert-Thresholds für Alert-Berechnung
         alert_stats_rows = await pool.fetch("""
-            SELECT 
-                pam.id as active_model_id,
-                COUNT(*) FILTER (
-                    WHERE p.prediction = 1 
-                    AND p.probability >= COALESCE(pam.alert_threshold, 0.7)
-                    AND EXISTS (
-                        SELECT 1 FROM alert_evaluations ae 
-                        WHERE ae.prediction_id = p.id
-                    )
-                ) as alerts_count
-            FROM prediction_active_models pam
-            LEFT JOIN predictions p ON p.active_model_id = pam.id
-            WHERE pam.id = ANY($1::bigint[])
-            GROUP BY pam.id
+            SELECT
+                active_model_id,
+                COUNT(*) FILTER (WHERE tag = 'alert') as alerts_count
+            FROM model_predictions
+            WHERE active_model_id = ANY($1::bigint[])
+            GROUP BY active_model_id
         """, active_model_ids)
         
         alerts_dict = {

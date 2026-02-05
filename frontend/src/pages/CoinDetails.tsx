@@ -348,16 +348,16 @@ const CoinDetails: React.FC = () => {
       </Breadcrumbs>
 
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 2, sm: 0 }, mb: 3 }}>
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.3rem', sm: '2.125rem' } }}>
             Coin-Details
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
             {coinId}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
           {predictionId ? (
             <Chip 
               label="Automatischer Zeitraum (10min vor/nach)" 
@@ -521,7 +521,7 @@ const CoinDetails: React.FC = () => {
           <Typography variant="h6" gutterBottom>
             📈 Reine Preis-Entwicklung in %
           </Typography>
-          <Box sx={{ height: 600, width: '100%', mt: 2 }}>
+          <Box sx={{ height: { xs: 350, sm: 450, md: 600 }, width: '100%', mt: 2 }}>
             <ResponsiveContainer>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />

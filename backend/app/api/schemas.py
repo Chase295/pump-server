@@ -132,6 +132,14 @@ class ModelInfo(BaseModel):
     max_log_entries_per_coin_positive: Optional[int] = Field(default=0, ge=0, le=1000, description="Max. Anzahl positiver Einträge pro Coin (0=unbegrenzt)")
     max_log_entries_per_coin_alert: Optional[int] = Field(default=0, ge=0, le=1000, description="Max. Anzahl Alert-Einträge pro Coin (0=unbegrenzt)")
     send_ignored_to_n8n: Optional[bool] = Field(default=False, description="Auch ignorierten Coins (Max-Log-Entries) an n8n senden")
+    accuracy: Optional[float] = None
+    f1_score: Optional[float] = None
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    roc_auc: Optional[float] = None
+    mcc: Optional[float] = None
+    simulated_profit_pct: Optional[float] = None
+    positive_predictions: Optional[int] = None
     stats: Optional[Dict[str, int]] = Field(None, description="Statistiken (positive_predictions, negative_predictions, alerts_count)")
     model_file_exists: bool = Field(default=True, description="Ob die Modell-Datei existiert (für Aktivierung benötigt)")
     created_at: datetime

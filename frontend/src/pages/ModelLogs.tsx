@@ -36,7 +36,9 @@ import {
   Snackbar,
   Switch,
   FormControlLabel,
-  Tooltip
+  Tooltip,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   ArrowBack as BackIcon,
@@ -61,6 +63,8 @@ const ITEMS_PER_PAGE = 50;
 const ModelLogs: React.FC = () => {
   const { modelId } = useParams<{ modelId: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const id = Number(modelId);
   const [page, setPage] = React.useState(1);
   const [showAll, setShowAll] = React.useState(false); // Option: Alle Einträge anzeigen
@@ -525,11 +529,11 @@ const ModelLogs: React.FC = () => {
 
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: { xs: 1, sm: 0 }, mb: 2 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, fontSize: { xs: '1.3rem', sm: '2.125rem' } }}>
             📋 Alert-Logs: {modelName}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
             <Tooltip title={showAll ? "Zeigt alle Einträge (bis zu 10.000)" : "Zeigt 50 Einträge pro Seite"}>
               <FormControlLabel
                 control={
@@ -591,7 +595,7 @@ const ModelLogs: React.FC = () => {
           >
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="primary">
+                <Typography variant="h4" color="primary" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.total}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -604,7 +608,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.alert}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -617,7 +621,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="warning.main">
+                <Typography variant="h4" color="warning.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.nonAlert}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -647,7 +651,7 @@ const ModelLogs: React.FC = () => {
           >
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.alertsSuccess}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -660,7 +664,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="error.main">
+                <Typography variant="h4" color="error.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.alertsFailed}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -673,7 +677,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="default">
+                <Typography variant="h4" color="default" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.alertsPending}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -686,9 +690,9 @@ const ModelLogs: React.FC = () => {
             </Card>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="info.main">
-                    {stats.alertsSuccess + stats.alertsFailed > 0 
-                      ? `${stats.alertsSuccessRate.toFixed(1)}%` 
+                  <Typography variant="h4" color="info.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                    {stats.alertsSuccess + stats.alertsFailed > 0
+                      ? `${stats.alertsSuccessRate.toFixed(1)}%`
                       : 'N/A'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -720,7 +724,7 @@ const ModelLogs: React.FC = () => {
           >
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.nonAlertsSuccess}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -733,7 +737,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="error.main">
+                <Typography variant="h4" color="error.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.nonAlertsFailed}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -746,7 +750,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="default">
+                <Typography variant="h4" color="default" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.nonAlertsPending}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -759,9 +763,9 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="info.main">
-                  {stats.nonAlertsSuccess + stats.nonAlertsFailed > 0 
-                    ? `${stats.nonAlertsSuccessRate.toFixed(1)}%` 
+                <Typography variant="h4" color="info.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
+                  {stats.nonAlertsSuccess + stats.nonAlertsFailed > 0
+                    ? `${stats.nonAlertsSuccessRate.toFixed(1)}%`
                     : '0%'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -792,7 +796,7 @@ const ModelLogs: React.FC = () => {
           >
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color={stats.totalPerformancePct >= 0 ? 'success.main' : 'error.main'}>
+                <Typography variant="h4" color={stats.totalPerformancePct >= 0 ? 'success.main' : 'error.main'} sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.totalPerformancePct >= 0 ? '+' : ''}{stats.totalPerformancePct.toFixed(2)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -805,7 +809,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="success.main">
+                <Typography variant="h4" color="success.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   +{stats.alertsProfitPct.toFixed(2)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -818,7 +822,7 @@ const ModelLogs: React.FC = () => {
             </Card>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" color="error.main">
+                <Typography variant="h4" color="error.main" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>
                   {stats.alertsLossPct.toFixed(2)}%
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -871,7 +875,7 @@ const ModelLogs: React.FC = () => {
                 value={filters.coinId || ''}
                 onChange={(e) => handleFilterChange('coinId', e.target.value || undefined)}
                 placeholder="z.B. F8t3Wmk9..."
-                sx={{ minWidth: 200 }}
+                sx={{ minWidth: { xs: '100%', sm: 200 } }}
               />
 
               <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -1009,7 +1013,7 @@ const ModelLogs: React.FC = () => {
 
             {/* Zeile 4: Zeitbereiche */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'end' }}>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'end', width: { xs: '100%', sm: 'auto' } }}>
                 <TextField
                   size="small"
                   type="datetime-local"
@@ -1017,6 +1021,7 @@ const ModelLogs: React.FC = () => {
                   value={filters.alertTimeFrom || ''}
                   onChange={(e) => handleFilterChange('alertTimeFrom', e.target.value || undefined)}
                   InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '100%', sm: 'auto' } }}
                 />
                 <TextField
                   size="small"
@@ -1025,10 +1030,11 @@ const ModelLogs: React.FC = () => {
                   value={filters.alertTimeTo || ''}
                   onChange={(e) => handleFilterChange('alertTimeTo', e.target.value || undefined)}
                   InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '100%', sm: 'auto' } }}
                 />
               </Box>
 
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'end' }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'end', width: { xs: '100%', sm: 'auto' } }}>
                 <TextField
                   size="small"
                   type="datetime-local"
@@ -1036,6 +1042,7 @@ const ModelLogs: React.FC = () => {
                   value={filters.evaluationTimeFrom || ''}
                   onChange={(e) => handleFilterChange('evaluationTimeFrom', e.target.value || undefined)}
                   InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '100%', sm: 'auto' } }}
                 />
                 <TextField
                   size="small"
@@ -1044,6 +1051,7 @@ const ModelLogs: React.FC = () => {
                   value={filters.evaluationTimeTo || ''}
                   onChange={(e) => handleFilterChange('evaluationTimeTo', e.target.value || undefined)}
                   InputLabelProps={{ shrink: true }}
+                  sx={{ width: { xs: '100%', sm: 'auto' } }}
                 />
               </Box>
             </Box>
@@ -1052,15 +1060,164 @@ const ModelLogs: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Alerts Tabelle */}
+      {/* Alerts Tabelle / Cards */}
       {alerts.length === 0 ? (
         <Alert severity="info">
           Es sind keine Alerts für dieses Modell verfügbar.
         </Alert>
       ) : (
         <>
-          <TableContainer component={Paper} sx={{ mb: 3 }}>
-            <Table size="small">
+          {/* Mobile: Card-Layout */}
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
+              {alerts.map((alert) => {
+                const alertStatus = getAlertStatus(alert);
+                const evalStatus = getEvaluationStatus(alert);
+                const athHighest = formatATHHighest(alert);
+                const athLowest = formatATHLowest(alert);
+                const actualChange = formatActualChange(alert);
+                return (
+                  <Card
+                    key={alert.id}
+                    sx={{
+                      cursor: 'pointer',
+                      border: alertStatus.label === 'Alert'
+                        ? '1px solid rgba(255, 152, 0, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      '&:active': { transform: 'scale(0.99)' }
+                    }}
+                    onClick={() => navigate(`/model/${id}/coin/${alert.coin_id}?prediction_id=${alert.id}`)}
+                  >
+                    <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                      {/* Zeile 1: Coin-ID + Status-Chips */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <OpenIcon sx={{ fontSize: 14, color: '#00d4ff' }} />
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#00d4ff', fontWeight: 600, fontSize: '0.8rem' }}>
+                            {alert.coin_id && alert.coin_id.length > 0 ? `${alert.coin_id.substring(0, 12)}...` : '(Keine Coin-ID)'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Chip
+                            label={alertStatus.label}
+                            color={alertStatus.color}
+                            size="small"
+                            sx={{
+                              fontWeight: 600,
+                              height: 22,
+                              fontSize: '0.7rem',
+                              ...(alertStatus.label === 'Alert' && {
+                                backgroundColor: '#ff9800',
+                                color: '#fff',
+                                fontWeight: 700,
+                                border: '1px solid #f57c00',
+                              })
+                            }}
+                          />
+                          <Chip
+                            {...(evalStatus.icon ? { icon: evalStatus.icon } : {})}
+                            label={evalStatus.label}
+                            color={evalStatus.color}
+                            size="small"
+                            sx={{ height: 22, fontSize: '0.7rem', '& .MuiChip-icon': { fontSize: 14 } }}
+                          />
+                        </Box>
+                      </Box>
+
+                      {/* Zeile 2: Wahrscheinlichkeit groß + Ziel */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1.5 }}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block', lineHeight: 1 }}>
+                            Wahrscheinlichkeit
+                          </Typography>
+                          <Typography variant="h6" fontWeight={700} color="primary" sx={{ fontSize: '1.2rem', lineHeight: 1.3 }}>
+                            {formatPercentage(alert.probability ? alert.probability * 100 : null)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', display: 'block', lineHeight: 1 }}>
+                            Ziel
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                            {alert.price_change_percent && alert.target_direction
+                              ? `${alert.target_direction === 'up' ? '↑' : '↓'} ${formatPercentage(alert.price_change_percent)}`
+                              : 'N/A'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {/* Zeile 3: ATH Highest / ATH Lowest / Tatsächliche Änderung */}
+                      <Box sx={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: 1,
+                        mb: 1.5,
+                        py: 1,
+                        px: 1,
+                        borderRadius: 1,
+                        bgcolor: 'rgba(255, 255, 255, 0.03)'
+                      }}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', display: 'block', lineHeight: 1, mb: 0.3 }}>
+                            ATH High
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, '& .MuiSvgIcon-root': { fontSize: 14 } }}>
+                            {athHighest.icon}
+                            <Typography variant="body2" color={athHighest.color} fontWeight={600} sx={{ fontSize: '0.8rem' }}>
+                              {athHighest.text}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', display: 'block', lineHeight: 1, mb: 0.3 }}>
+                            ATH Low
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, '& .MuiSvgIcon-root': { fontSize: 14 } }}>
+                            {athLowest.icon}
+                            <Typography variant="body2" color={athLowest.color} fontWeight={600} sx={{ fontSize: '0.8rem' }}>
+                              {athLowest.text}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', display: 'block', lineHeight: 1, mb: 0.3 }}>
+                            Änderung
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, '& .MuiSvgIcon-root': { fontSize: 14 } }}>
+                            {actualChange.icon}
+                            <Typography variant="body2" color={actualChange.color} fontWeight={600} sx={{ fontSize: '0.8rem' }}>
+                              {actualChange.text}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Zeile 4: Zeitstempel */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>Alert:</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            {formatTimestamp(alert.prediction_timestamp)}
+                          </Typography>
+                        </Box>
+                        {alert.evaluation_timestamp && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>Eval:</Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              {formatTimestamp(alert.evaluation_timestamp)}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          ) : (
+          /* Desktop: Tabelle */
+          <TableContainer component={Paper} sx={{ mb: 3, overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Coin ID</TableCell>
@@ -1082,7 +1239,7 @@ const ModelLogs: React.FC = () => {
                   const athHighest = formatATHHighest(alert);
                   const athLowest = formatATHLowest(alert);
                   const actualChange = formatActualChange(alert);
-                  
+
                   return (
                     <TableRow key={alert.id} hover>
                       <TableCell>
@@ -1091,13 +1248,13 @@ const ModelLogs: React.FC = () => {
                           size="small"
                           onClick={() => navigate(`/model/${id}/coin/${alert.coin_id}?prediction_id=${alert.id}`)}
                           startIcon={<OpenIcon />}
-                          sx={{ 
+                          sx={{
                             fontFamily: 'monospace',
                             color: '#00d4ff',
                             borderColor: '#00d4ff',
                             textTransform: 'none',
                             fontWeight: 600,
-                            '&:hover': { 
+                            '&:hover': {
                               backgroundColor: 'rgba(0, 212, 255, 0.2)',
                               borderColor: '#00d4ff',
                               color: '#00d4ff',
@@ -1117,7 +1274,7 @@ const ModelLogs: React.FC = () => {
                           label={alertStatus.label}
                           color={alertStatus.color}
                           size="small"
-                          sx={{ 
+                          sx={{
                             fontWeight: 600,
                             minWidth: 80,
                             // Alerts besonders hervorheben mit Orange
@@ -1194,6 +1351,7 @@ const ModelLogs: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          )}
           
           {/* Pagination - nur anzeigen wenn nicht "Alle anzeigen" aktiviert */}
           {!showAll && totalPages > 1 && (

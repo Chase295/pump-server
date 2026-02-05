@@ -29,7 +29,6 @@ import PageContainer from '../components/layout/PageContainer';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import OverviewTab from '../components/modelDetails/OverviewTab';
 import PerformanceTab from '../components/modelDetails/PerformanceTab';
-import PredictionsTab from '../components/modelDetails/PredictionsTab';
 // import ConfigurationTab from '../components/modelDetails/ConfigurationTab'; // Temporär deaktiviert wegen Build-Fehlern
 import JsonExportTab from '../components/modelDetails/JsonExportTab';
 
@@ -227,11 +226,11 @@ const ModelDetails: React.FC = () => {
           sx={{
             display: 'grid',
             gridTemplateColumns: {
-              xs: '1fr',
+              xs: 'repeat(2, 1fr)',
               sm: 'repeat(2, 1fr)',
               md: 'repeat(4, 1fr)'
             },
-            gap: 3
+            gap: { xs: 1.5, sm: 3 }
           }}
         >
           <Card>
@@ -313,7 +312,6 @@ const ModelDetails: React.FC = () => {
         >
           <Tab label="📊 Übersicht" />
           <Tab label="🎯 Performance" />
-          <Tab label="🔮 Vorhersagen" />
           <Tab label="📋 JSON Export" />
         </Tabs>
       </Box>
@@ -328,10 +326,6 @@ const ModelDetails: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={activeTab} index={2}>
-        <PredictionsTab modelId={modelId} />
-      </TabPanel>
-
-      <TabPanel value={activeTab} index={3}>
         <JsonExportTab model={model} />
       </TabPanel>
 
