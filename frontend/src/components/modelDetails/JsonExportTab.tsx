@@ -140,30 +140,30 @@ const JsonExportTab: React.FC<JsonExportTabProps> = ({ model }) => {
           </Accordion>
 
           {/* Zusammenfassung */}
-          <Box sx={{ mt: 3, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          <Box sx={{ mt: 3, p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'text.primary' }}>
               📊 Zusammenfassung
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
               <Box>
                 <Typography variant="body2" color="text.secondary">Modell-ID</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>{model.id}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>{model.id}</Typography>
               </Box>
               <Box>
                 <Typography variant="body2" color="text.secondary">Name</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>{model.name}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>{model.name}</Typography>
               </Box>
               <Box>
                 <Typography variant="body2" color="text.secondary">Typ</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>{model.model_type}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>{model.model_type}</Typography>
               </Box>
               <Box>
                 <Typography variant="body2" color="text.secondary">Features</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>{model.features?.length || 0}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>{model.features?.length || 0}</Typography>
               </Box>
               <Box>
                 <Typography variant="body2" color="text.secondary">Vorhersagen</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 500 }}>{model.total_predictions || 0}</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500, color: 'text.primary' }}>{model.total_predictions || 0}</Typography>
               </Box>
               <Box>
                 <Typography variant="body2" color="text.secondary">Status</Typography>

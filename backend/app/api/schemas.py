@@ -133,6 +133,7 @@ class ModelInfo(BaseModel):
     max_log_entries_per_coin_alert: Optional[int] = Field(default=0, ge=0, le=1000, description="Max. Anzahl Alert-Einträge pro Coin (0=unbegrenzt)")
     send_ignored_to_n8n: Optional[bool] = Field(default=False, description="Auch ignorierten Coins (Max-Log-Entries) an n8n senden")
     stats: Optional[Dict[str, int]] = Field(None, description="Statistiken (positive_predictions, negative_predictions, alerts_count)")
+    model_file_exists: bool = Field(default=True, description="Ob die Modell-Datei existiert (für Aktivierung benötigt)")
     created_at: datetime
 
 

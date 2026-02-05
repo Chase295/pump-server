@@ -391,6 +391,7 @@ async def get_active_models(include_inactive: bool = False) -> List[Dict[str, An
         alerts_dict = {}
     
     import json
+    import os
     models = []
     for row in rows:
         # JSONB-Felder konvertieren
@@ -489,9 +490,11 @@ async def get_active_models(include_inactive: bool = False) -> List[Dict[str, An
                 'positive_predictions': model_stats.get('positive', 0),
                 'negative_predictions': model_stats.get('negative', 0),
                 'alerts_count': model_alerts
-            }
+            },
+            # Prüfe ob Modell-Datei existiert
+            'model_file_exists': bool(row['local_model_path'] and os.path.exists(row['local_model_path']))
         })
-    
+
     return models
 
 async def import_model(

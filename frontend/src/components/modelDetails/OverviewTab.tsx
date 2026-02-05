@@ -40,7 +40,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ model }) => {
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+      <Typography
+        variant="h5"
+        gutterBottom
+        sx={{ fontWeight: 600, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+      >
         📊 Modell-Übersicht
       </Typography>
 

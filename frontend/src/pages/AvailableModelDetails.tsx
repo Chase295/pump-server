@@ -178,20 +178,44 @@ const AvailableModelDetails: React.FC = () => {
 
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+        <Box sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'flex-start' },
+          gap: { xs: 2, sm: 0 },
+          mb: 2
+        }}>
+          <Box sx={{ mb: { xs: 1, sm: 0 } }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                mb: 1,
+                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' }
+              }}
+            >
               🔍 {modelName}
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}
+            >
               ID: {model.id} • Typ: {model.model_type} • Ziel: {model.target_direction?.toUpperCase()}
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Box sx={{
+            display: 'flex',
+            gap: { xs: 1, sm: 2 },
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            width: { xs: '100%', sm: 'auto' }
+          }}>
             <Chip
-              label={isActive ? 'Aktiv' : 'Inaktiv'}
-              color={isActive ? 'success' : 'default'}
+              label={isActive ? 'Aktiv' : 'Verfügbar'}
+              color={isActive ? 'success' : 'info'}
               variant={isActive ? 'filled' : 'outlined'}
               size="medium"
             />
@@ -200,6 +224,8 @@ const AvailableModelDetails: React.FC = () => {
               color="primary"
               startIcon={<ImportIcon />}
               onClick={handleImport}
+              size="small"
+              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
             >
               Importieren
             </Button>
@@ -207,6 +233,8 @@ const AvailableModelDetails: React.FC = () => {
               startIcon={<BackIcon />}
               onClick={handleBack}
               variant="outlined"
+              size="small"
+              sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
             >
               Zurück
             </Button>
@@ -226,44 +254,56 @@ const AvailableModelDetails: React.FC = () => {
           }}
         >
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="primary">
+            <CardContent sx={{ textAlign: 'center', py: { xs: 1.5, sm: 2 }, px: { xs: 1, sm: 2 } }}>
+              <Typography
+                color="primary"
+                sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 600 }}
+              >
                 {model.total_predictions || 0}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                 Vorhersagen Gesamt
               </Typography>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="success.main">
+            <CardContent sx={{ textAlign: 'center', py: { xs: 1.5, sm: 2 }, px: { xs: 1, sm: 2 } }}>
+              <Typography
+                color="success.main"
+                sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 600 }}
+              >
                 {model.average_probability ? `${(model.average_probability * 100).toFixed(1)}%` : 'N/A'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                 Ø Wahrscheinlichkeit
               </Typography>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="info.main">
+            <CardContent sx={{ textAlign: 'center', py: { xs: 1.5, sm: 2 }, px: { xs: 1, sm: 2 } }}>
+              <Typography
+                color="info.main"
+                sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 600 }}
+              >
                 {model.accuracy ? `${(model.accuracy * 100).toFixed(1)}%` : 'N/A'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                 Accuracy
               </Typography>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="warning.main">
+            <CardContent sx={{ textAlign: 'center', py: { xs: 1.5, sm: 2 }, px: { xs: 1, sm: 2 } }}>
+              <Typography
+                color="warning.main"
+                sx={{ fontSize: { xs: '1.5rem', sm: '2rem' }, fontWeight: 600 }}
+              >
                 {model.positive_predictions || 0}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                 Positive Vorhersagen
               </Typography>
             </CardContent>
@@ -277,11 +317,16 @@ const AvailableModelDetails: React.FC = () => {
           value={activeTab}
           onChange={handleTabChange}
           aria-label="model details tabs"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',
-              fontSize: '0.95rem',
-              fontWeight: 500
+              fontSize: { xs: '0.8rem', sm: '0.95rem' },
+              fontWeight: 500,
+              minWidth: { xs: 'auto', sm: 90 },
+              px: { xs: 1.5, sm: 2 }
             }
           }}
         >

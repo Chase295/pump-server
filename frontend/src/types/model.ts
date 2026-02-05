@@ -75,6 +75,9 @@ export interface Model {
     alerts_loss_pct?: number;
   };
 
+  // Modell-Datei Status
+  model_file_exists?: boolean;
+
   // Timestamps
   created_at?: string;
   updated_at?: string;

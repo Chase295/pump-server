@@ -315,6 +315,68 @@ async def get_models_endpoint(include_inactive: str = "false"):
     return await get_active_models_endpoint(include_inactive)
 
 
+@router.get("/models/active", response_model=ModelsListResponse)
+async def get_active_models_endpoint(include_inactive: str = "false"):
+    """
+    Liste aller aktiven Modelle (aus prediction_active_models)
+
+    Args:
+        include_inactive: Query-Parameter als String ("true" oder "false")
+    """
+    try:
+        # Konvertiere String zu bool
+        include_inactive_bool = include_inactive.lower() == "true"
+        models = await get_active_models(include_inactive=include_inactive_bool)
+
+        model_infos = [
+            ModelInfo(
+                id=m['id'],
+                model_id=m['model_id'],
+                name=m['name'],
+                custom_name=m.get('custom_name'),
+                model_type=m['model_type'],
+                target_variable=m['target_variable'],
+                target_operator=m['target_operator'],
+                target_value=m['target_value'],
+                future_minutes=m['future_minutes'],
+                price_change_percent=m['price_change_percent'],
+                target_direction=m['target_direction'],
+                features=m['features'],
+                phases=m['phases'],
+                params=m['params'],
+                is_active=m['is_active'],
+                total_predictions=m['total_predictions'],
+                average_probability=m.get('average_probability'),
+                last_prediction_at=m['last_prediction_at'],
+                alert_threshold=m.get('alert_threshold', 0.7),
+                n8n_webhook_url=m.get('n8n_webhook_url'),
+                n8n_send_mode=_parse_send_mode_for_response(m.get('n8n_send_mode', 'all')),
+                n8n_enabled=m.get('n8n_enabled', True),
+                coin_filter_mode=m.get('coin_filter_mode', 'all'),
+                coin_whitelist=m.get('coin_whitelist'),
+                ignore_bad_seconds=m.get('ignore_bad_seconds', 0),
+                ignore_positive_seconds=m.get('ignore_positive_seconds', 0),
+                ignore_alert_seconds=m.get('ignore_alert_seconds', 0),
+                max_log_entries_per_coin_negative=m.get('max_log_entries_per_coin_negative', 0),
+                max_log_entries_per_coin_positive=m.get('max_log_entries_per_coin_positive', 0),
+                max_log_entries_per_coin_alert=m.get('max_log_entries_per_coin_alert', 0),
+                send_ignored_to_n8n=m.get('send_ignored_to_n8n', False),
+                stats=m.get('stats'),
+                model_file_exists=m.get('model_file_exists', True),
+                created_at=m['created_at']
+            )
+            for m in models
+        ]
+
+        return ModelsListResponse(
+            models=model_infos,
+            total=len(model_infos)
+        )
+    except Exception as e:
+        logger.error(f"❌ Fehler beim Laden aktiver Modelle: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/models/{active_model_id}", response_model=ModelInfo)
 async def get_active_model_endpoint(active_model_id: int):
     """
@@ -363,73 +425,13 @@ async def get_active_model_endpoint(active_model_id: int):
             max_log_entries_per_coin_alert=model.get('max_log_entries_per_coin_alert', 0),
             send_ignored_to_n8n=model.get('send_ignored_to_n8n', False),
             stats=model.get('stats'),
+            model_file_exists=model.get('model_file_exists', True),
             created_at=model.get('created_at')
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Fehler beim Laden des Modells {active_model_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/models/active", response_model=ModelsListResponse)
-async def get_active_models_endpoint(include_inactive: str = "false"):
-    """
-    Liste aller aktiven Modelle (aus prediction_active_models)
-    
-    Args:
-        include_inactive: Query-Parameter als String ("true" oder "false")
-    """
-    try:
-        # Konvertiere String zu bool
-        include_inactive_bool = include_inactive.lower() == "true"
-        models = await get_active_models(include_inactive=include_inactive_bool)
-        
-        model_infos = [
-            ModelInfo(
-                id=m['id'],
-                model_id=m['model_id'],
-                name=m['name'],
-                custom_name=m.get('custom_name'),
-                model_type=m['model_type'],
-                target_variable=m['target_variable'],
-                target_operator=m['target_operator'],
-                target_value=m['target_value'],
-                future_minutes=m['future_minutes'],
-                price_change_percent=m['price_change_percent'],
-                target_direction=m['target_direction'],
-                features=m['features'],
-                phases=m['phases'],
-                params=m['params'],
-                is_active=m['is_active'],
-                total_predictions=m['total_predictions'],
-                average_probability=m.get('average_probability'),
-                last_prediction_at=m['last_prediction_at'],
-                alert_threshold=m.get('alert_threshold', 0.7),
-                n8n_webhook_url=m.get('n8n_webhook_url'),
-                n8n_send_mode=_parse_send_mode_for_response(m.get('n8n_send_mode', 'all')),
-                n8n_enabled=m.get('n8n_enabled', True),  # WICHTIG: Muss explizit übergeben werden!
-                coin_filter_mode=m.get('coin_filter_mode', 'all'),
-                coin_whitelist=m.get('coin_whitelist'),
-                ignore_bad_seconds=m.get('ignore_bad_seconds', 0),
-                ignore_positive_seconds=m.get('ignore_positive_seconds', 0),
-                ignore_alert_seconds=m.get('ignore_alert_seconds', 0),
-                max_log_entries_per_coin_negative=m.get('max_log_entries_per_coin_negative', 0),
-                max_log_entries_per_coin_positive=m.get('max_log_entries_per_coin_positive', 0),
-                max_log_entries_per_coin_alert=m.get('max_log_entries_per_coin_alert', 0),
-                send_ignored_to_n8n=m.get('send_ignored_to_n8n', False),
-                stats=m.get('stats'),
-                created_at=m['created_at']
-            )
-            for m in models
-        ]
-        
-        return ModelsListResponse(
-            models=model_infos,
-            total=len(model_infos)
-        )
-    except Exception as e:
-        logger.error(f"❌ Fehler beim Laden aktiver Modelle: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

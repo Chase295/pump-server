@@ -2,7 +2,7 @@
  * Overview Page
  * Hauptübersicht aller ML-Modelle mit Live-Daten aus der API
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Typography,
@@ -15,7 +15,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Snackbar
 } from '@mui/material';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Refresh as RefreshIcon, Add as AddIcon } from '@mui/icons-material';
@@ -95,6 +96,7 @@ const Overview: React.FC = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [modelToDelete, setModelToDelete] = React.useState<{id: number, name: string} | null>(null);
+  const [errorSnackbar, setErrorSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
   // Modell löschen
   const deleteMutation = useMutation({
@@ -120,8 +122,24 @@ const Overview: React.FC = () => {
       invalidateQueries.models(); // Cache invalidieren
       refetch(); // Sofort neu laden
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Fehler beim Ändern des Modell-Status:', error);
+
+      // Extrahiere Fehlermeldung aus der API-Response
+      let errorMessage = 'Fehler beim Ändern des Modell-Status';
+
+      if (error?.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (detail.includes('Modell-Datei nicht gefunden')) {
+          errorMessage = 'Das Modell kann nicht aktiviert werden, da die Modell-Datei fehlt. Bitte importiere das Modell erneut.';
+        } else if (detail.includes('ungültig')) {
+          errorMessage = 'Die Modell-Datei ist beschädigt und kann nicht geladen werden.';
+        } else {
+          errorMessage = detail;
+        }
+      }
+
+      setErrorSnackbar({ open: true, message: errorMessage });
     }
   });
 
@@ -322,6 +340,23 @@ const Overview: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={errorSnackbar.open}
+        autoHideDuration={8000}
+        onClose={() => setErrorSnackbar({ open: false, message: '' })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setErrorSnackbar({ open: false, message: '' })}
+          severity="error"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {errorSnackbar.message}
+        </Alert>
+      </Snackbar>
     </PageContainer>
   );
 };

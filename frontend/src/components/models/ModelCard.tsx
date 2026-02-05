@@ -26,12 +26,11 @@ import {
   Settings as SettingsIcon,
   Delete as DeleteIcon,
   List as ListIcon,
-  TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Assessment as AssessmentIcon,
   Psychology as PsychologyIcon,
   ShowChart as ShowChartIcon,
-  AttachMoney as AttachMoneyIcon
+  AttachMoney as AttachMoneyIcon,
+  Warning as WarningIcon
 } from '@mui/icons-material';
 import type { Model } from '../../types/model';
 
@@ -244,6 +243,27 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
           />
         </Box>
 
+        {/* Warnung wenn Modell-Datei fehlt */}
+        {model.model_file_exists === false && (
+          <Box
+            sx={{
+              mb: 2,
+              p: 1.5,
+              background: 'linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.05) 100%)',
+              borderRadius: 2,
+              border: '1px solid rgba(244, 67, 54, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
+            }}
+          >
+            <WarningIcon sx={{ color: 'error.main', fontSize: 20 }} />
+            <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600 }}>
+              Modell-Datei fehlt - kann nicht aktiviert werden
+            </Typography>
+          </Box>
+        )}
+
         {/* Basis-Statistiken */}
         <Box
           sx={{
@@ -255,11 +275,11 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
             backdropFilter: 'blur(10px)'
           }}
         >
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              mb: 1.5, 
-              display: 'block', 
+          <Typography
+            variant="caption"
+            sx={{
+              mb: 1.5,
+              display: 'block',
               fontWeight: 700,
               fontSize: '0.75rem',
               textTransform: 'uppercase',
@@ -363,11 +383,11 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
                 >
                   <SettingsIcon fontSize="small" sx={{ color: model.n8n_enabled ? 'success.main' : 'text.secondary' }} />
                 </Box>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 700, 
-                    color: model.n8n_enabled ? 'success.main' : 'text.secondary' 
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: model.n8n_enabled ? 'success.main' : 'text.secondary'
                   }}
                 >
                   {model.n8n_enabled ? 'Aktiv' : 'Aus'}
@@ -380,8 +400,8 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
           </Box>
         </Box>
 
-        {/* Alert-Performance (wenn verfügbar) */}
-        {model.alert_stats && (stats.alertsSuccess > 0 || stats.alertsFailed > 0 || stats.alertsPending > 0) && (
+        {/* Auswertung der Alert-Vorhersagen - Confusion Matrix (nur wenn Daten vorhanden) */}
+        {model.alert_stats && (stats.alertsSuccess > 0 || stats.alertsFailed > 0 || stats.nonAlertsSuccess > 0 || stats.nonAlertsFailed > 0) && (
           <Box
             sx={{
               mb: 2,
@@ -392,11 +412,11 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
               backdropFilter: 'blur(10px)'
             }}
           >
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                mb: 1.5, 
-                display: 'block', 
+            <Typography
+              variant="caption"
+              sx={{
+                mb: 1.5,
+                display: 'block',
                 fontWeight: 700,
                 fontSize: '0.75rem',
                 textTransform: 'uppercase',
@@ -404,111 +424,88 @@ const ModelCard: React.FC<ModelCardProps> = React.memo(({
                 color: 'success.main'
               }}
             >
-              ✅ Alert-Performance
+              ✅ Auswertung der Alert-Vorhersagen
             </Typography>
+            {/* Confusion Matrix Tabelle */}
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: 2
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: 0.5,
+                fontSize: '0.75rem'
               }}
             >
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(76, 175, 80, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <TrendingUpIcon fontSize="small" sx={{ color: 'success.main' }} />
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    {stats.alertsSuccess}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', ml: 5 }}>
-                  Erfolgreich
-                </Typography>
+              {/* Header Row */}
+              <Box sx={{ p: 0.75, fontWeight: 600, color: 'text.secondary', fontSize: '0.65rem' }}>
+                Tatsächlich
+              </Box>
+              <Box sx={{ p: 0.75, textAlign: 'center', fontWeight: 700, color: 'success.main', fontSize: '0.7rem' }}>
+                Alert ✅
+              </Box>
+              <Box sx={{ p: 0.75, textAlign: 'center', fontWeight: 700, color: 'text.secondary', fontSize: '0.7rem' }}>
+                Kein Alert
               </Box>
 
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(244, 67, 54, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <TrendingDownIcon fontSize="small" sx={{ color: 'error.main' }} />
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'error.main' }}>
-                    {stats.alertsFailed}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', ml: 5 }}>
-                  Fehlgeschlagen
-                </Typography>
+              {/* Row 1: Eingetroffen */}
+              <Box sx={{ p: 0.75, fontWeight: 600, color: 'text.secondary', fontSize: '0.7rem', display: 'flex', alignItems: 'center' }}>
+                Eingetroffen
+              </Box>
+              <Box
+                sx={{
+                  p: 0.75,
+                  textAlign: 'center',
+                  bgcolor: 'rgba(76, 175, 80, 0.2)',
+                  borderRadius: 1,
+                  fontWeight: 700,
+                  color: 'success.main',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {stats.alertsSuccess}
+              </Box>
+              <Box
+                sx={{
+                  p: 0.75,
+                  textAlign: 'center',
+                  bgcolor: 'rgba(255, 193, 7, 0.15)',
+                  borderRadius: 1,
+                  fontWeight: 700,
+                  color: 'warning.main',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {stats.nonAlertsFailed}
               </Box>
 
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(33, 150, 243, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <AssessmentIcon fontSize="small" sx={{ color: 'info.main' }} />
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'info.main' }}>
-                    {stats.alertsSuccessRate > 0 ? `${stats.alertsSuccessRate.toFixed(1)}%` : 'N/A'}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', ml: 5 }}>
-                  {stats.alertsPending > 0
-                    ? `${stats.alertsSuccess + stats.alertsFailed} ausgewertet`
-                    : 'Success-Rate'}
-                </Typography>
+              {/* Row 2: Nicht eingetroffen */}
+              <Box sx={{ p: 0.75, fontWeight: 600, color: 'text.secondary', fontSize: '0.7rem', display: 'flex', alignItems: 'center' }}>
+                Nicht eingetroffen
               </Box>
-
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Box
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(255, 193, 7, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <NotificationsIcon fontSize="small" sx={{ color: 'warning.main' }} />
-                  </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'warning.main' }}>
-                    {stats.alertsPending || 0}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', ml: 5 }}>
-                  Ausstehend
-                </Typography>
+              <Box
+                sx={{
+                  p: 0.75,
+                  textAlign: 'center',
+                  bgcolor: 'rgba(244, 67, 54, 0.2)',
+                  borderRadius: 1,
+                  fontWeight: 700,
+                  color: 'error.main',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {stats.alertsFailed}
+              </Box>
+              <Box
+                sx={{
+                  p: 0.75,
+                  textAlign: 'center',
+                  bgcolor: 'rgba(76, 175, 80, 0.1)',
+                  borderRadius: 1,
+                  fontWeight: 700,
+                  color: 'success.light',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {stats.nonAlertsSuccess}
               </Box>
             </Box>
           </Box>
