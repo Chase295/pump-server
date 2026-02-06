@@ -1,40 +1,40 @@
-# 📊 Pump Server - Datenbank-Schema Dokumentation
+# Pump Server - Datenbank-Schema Dokumentation
 
-**Version:** 1.0  
-**Datum:** 2025-01-XX  
+**Version:** 2.0
+**Datum:** Februar 2026
 **Datenbank:** PostgreSQL
 
 ---
 
-## 📋 Übersicht
+## Uebersicht
 
-Dieses Schema erweitert die bestehende `crypto` Datenbank um Tabellen für den Pump Server. **Wichtig:** Es werden **KEINE** bestehenden Tabellen geändert, nur neue Tabellen hinzugefügt.
+Dieses Schema erweitert die bestehende `crypto` Datenbank um Tabellen fuer den Pump Server. **Wichtig:** Es werden **KEINE** bestehenden Tabellen geaendert, nur neue Tabellen hinzugefuegt.
 
-### Neue Tabellen:
+### Tabellen:
 1. `prediction_active_models` - Verwaltung aktiver Modelle im Prediction Service
-2. `predictions` - Speicherung aller Vorhersagen
+2. `predictions` - Speicherung aller Vorhersagen (Legacy)
 3. `prediction_webhook_log` - Logging von n8n Webhook-Aufrufen
+4. `model_predictions` - Vorhersagen mit Tags, Status und Evaluation (aktuelle Architektur)
+5. `alert_evaluations` - Alert-Auswertungen mit Preishistorie
+6. `coin_scan_cache` - Cache fuer Coin-Ignore-Logik
 
 ### Trigger:
-- `coin_metrics_insert_trigger` - LISTEN/NOTIFY für Echtzeit-Events
+- `coin_metrics_insert_trigger` - LISTEN/NOTIFY fuer Echtzeit-Events
 
 ---
 
-## 🔔 Trigger: `coin_metrics_insert_trigger`
+## Trigger: `coin_metrics_insert_trigger`
 
 ### Was macht der Trigger?
 
-Der Trigger **überwacht automatisch** alle neuen Einträge in der `coin_metrics` Tabelle und sendet eine **Echtzeit-Benachrichtigung** an den Pump Server.
+Der Trigger ueberwacht automatisch alle neuen Eintraege in der `coin_metrics` Tabelle und sendet eine Echtzeit-Benachrichtigung an den Pump Server.
 
 ### Funktionsweise:
 
 1. **Trigger-Funktion:** `notify_coin_metrics_insert()`
-   - Wird **automatisch** bei jedem `INSERT` in `coin_metrics` ausgeführt
-   - Erstellt eine JSON-Nachricht mit:
-     - `mint` (Coin-ID)
-     - `timestamp` (Zeitstempel)
-     - `phase_id` (Phase zum Zeitpunkt)
-   - Sendet diese Nachricht über PostgreSQL `pg_notify()`
+   - Wird automatisch bei jedem `INSERT` in `coin_metrics` ausgefuehrt
+   - Erstellt eine JSON-Nachricht mit `mint`, `timestamp`, `phase_id`
+   - Sendet ueber PostgreSQL `pg_notify()`
 
 2. **Trigger-Definition:**
    ```sql
@@ -43,78 +43,35 @@ Der Trigger **überwacht automatisch** alle neuen Einträge in der `coin_metrics
        FOR EACH ROW
        EXECUTE FUNCTION notify_coin_metrics_insert();
    ```
-   - **Timing:** `AFTER INSERT` - Nach dem Einfügen
-   - **Scope:** `FOR EACH ROW` - Für jede neue Zeile
 
-### Wie funktioniert LISTEN/NOTIFY?
+### LISTEN/NOTIFY
 
-**PostgreSQL LISTEN/NOTIFY** ist ein **Push-Mechanismus** für Echtzeit-Kommunikation:
-
-1. **Trigger sendet NOTIFY:**
-   - Bei jedem neuen `coin_metrics` Eintrag
-   - Channel: `coin_metrics_insert`
-   - Payload: JSON-String mit Coin-Informationen
-
-2. **Prediction Service hört zu:**
-   - Verbindung mit `LISTEN coin_metrics_insert`
-   - Empfängt Nachricht **sofort** (< 100ms Latenz)
-   - Verarbeitet Coin automatisch
-
-3. **Vorteile:**
-   - ✅ **Echtzeit** (< 100ms statt 30s Polling)
-   - ✅ **Effizient** (keine ständigen DB-Queries)
-   - ✅ **Skalierbar** (mehrere Services können zuhören)
-
-### Beispiel-Workflow:
-
-```
-1. Neuer Coin-Eintrag in coin_metrics
-   ↓
-2. Trigger feuert automatisch
-   ↓
-3. pg_notify('coin_metrics_insert', '{"mint":"ABC123","timestamp":"2025-01-XX",...}')
-   ↓
-4. Prediction Service empfängt Nachricht (via LISTEN)
-   ↓
-5. Service macht Vorhersage für Coin
-   ↓
-6. Speichert in predictions Tabelle
-   ↓
-7. Sendet an n8n (falls konfiguriert)
-```
-
-### Fallback: Polling
-
-Falls LISTEN/NOTIFY nicht verfügbar ist (z.B. Netzwerk-Probleme), nutzt der Service **Polling** als Fallback:
-- Prüft alle 30 Sekunden auf neue Einträge
-- Weniger effizient, aber zuverlässig
+PostgreSQL LISTEN/NOTIFY ist ein Push-Mechanismus fuer Echtzeit-Kommunikation:
+- Channel: `coin_metrics_insert`
+- Latenz: < 100ms
+- Fallback: Polling alle 30 Sekunden
 
 ---
 
-## 📑 Tabelle 1: `prediction_active_models`
+## Tabelle 1: `prediction_active_models`
 
 ### Zweck
-Verwaltet alle **aktiven Modelle** im Prediction Service. Diese Tabelle ist **lokal** im Prediction Service und **unabhängig** von `ml_models` im Training Service.
-
-### Warum separate Tabelle?
-- **Separater Server:** Prediction Service läuft auf anderem Server
-- **Lokale Verwaltung:** Modelle werden heruntergeladen und lokal gespeichert
-- **Unabhängigkeit:** Prediction Service kann Modelle aktivieren/deaktivieren ohne Training Service
+Verwaltet alle aktiven Modelle im Prediction Service. Diese Tabelle ist lokal und unabhaengig von `ml_models` im Training Service.
 
 ### Felder:
 
 | Feld | Typ | Beschreibung |
 |------|-----|--------------|
-| `id` | BIGSERIAL | Primärschlüssel (lokal) |
+| `id` | BIGSERIAL | Primaerschluessel (lokal) |
 | `model_id` | BIGINT | Referenz zu `ml_models.id` (kein FK!) |
 | `model_name` | VARCHAR(255) | Name des Modells |
 | `model_type` | VARCHAR(50) | `random_forest` oder `xgboost` |
 | `target_variable` | VARCHAR(100) | Ziel-Variable (z.B. `price_close`) |
 | `target_operator` | VARCHAR(10) | Operator (`>`, `<`, `>=`, `<=`, `=`) oder NULL |
 | `target_value` | NUMERIC(20,2) | Ziel-Wert oder NULL |
-| `future_minutes` | INTEGER | Minuten in die Zukunft (zeitbasierte Vorhersage) |
-| `price_change_percent` | NUMERIC(10,4) | Prozentuale Änderung (zeitbasierte Vorhersage) |
-| `target_direction` | VARCHAR(10) | `up` oder `down` (zeitbasierte Vorhersage) |
+| `future_minutes` | INTEGER | Minuten in die Zukunft |
+| `price_change_percent` | NUMERIC(10,4) | Prozentuale Aenderung |
+| `target_direction` | VARCHAR(10) | `up` oder `down` |
 | `features` | JSONB | Liste der Features (Array) |
 | `phases` | JSONB | Liste der Phasen (Array) oder NULL |
 | `params` | JSONB | Modell-Parameter (Object) |
@@ -128,322 +85,386 @@ Verwaltet alle **aktiven Modelle** im Prediction Service. Diese Tabelle ist **lo
 | `created_at` | TIMESTAMP | Erstellt am |
 | `updated_at` | TIMESTAMP | Aktualisiert am |
 | `custom_name` | VARCHAR(255) | Optional: Lokaler Name (falls umbenannt) |
+| **Alert-Konfiguration** | | |
+| `alert_threshold` | NUMERIC(5,4) | Alert-Schwellenwert (Default: 0.7) |
+| `n8n_webhook_url` | TEXT | n8n Webhook-URL |
+| `n8n_enabled` | BOOLEAN | Webhook aktiviert? |
+| `n8n_send_mode` | JSONB | Send-Modus als Array (`["alerts_only"]`) |
+| `n8n_last_status` | VARCHAR(20) | Letzter Webhook-Status |
+| `n8n_last_error` | TEXT | Letzter Webhook-Fehler |
+| `coin_filter_mode` | VARCHAR(20) | `all` oder `whitelist` |
+| `coin_whitelist` | JSONB | Liste erlaubter Coin-Adressen |
+| **Ignore-Einstellungen** | | |
+| `ignore_bad_seconds` | INTEGER | Sekunden: negative Coins ignorieren (Default: 0) |
+| `ignore_positive_seconds` | INTEGER | Sekunden: positive Coins ignorieren (Default: 0) |
+| `ignore_alert_seconds` | INTEGER | Sekunden: Alert-Coins ignorieren (Default: 0) |
+| `send_ignored_to_n8n` | BOOLEAN | Ignorierte trotzdem an n8n senden? |
+| `min_scan_interval_seconds` | INTEGER | Minimaler Scan-Intervall |
+| **Max-Log-Entries** | | |
+| `max_log_entries_per_coin_negative` | INTEGER | Max negative Eintraege pro Coin (0=unbegrenzt) |
+| `max_log_entries_per_coin_positive` | INTEGER | Max positive Eintraege pro Coin (0=unbegrenzt) |
+| `max_log_entries_per_coin_alert` | INTEGER | Max Alert-Eintraege pro Coin (0=unbegrenzt) |
+| **Performance-Metriken** | | |
+| `training_accuracy` | NUMERIC(10,6) | Training Accuracy |
+| `training_f1` | NUMERIC(10,6) | Training F1 Score |
+| `training_precision` | NUMERIC(10,6) | Training Precision |
+| `training_recall` | NUMERIC(10,6) | Training Recall |
+| `training_roc_auc` | NUMERIC(10,6) | Training ROC-AUC |
+| `training_mcc` | NUMERIC(10,6) | Training MCC |
 
 ### Constraints:
 
-- **`chk_model_type`:** Nur `random_forest` oder `xgboost` erlaubt
-- **`chk_operator`:** Nur gültige Operatoren oder NULL
+- **`chk_model_type`:** Nur `random_forest` oder `xgboost`
+- **`chk_operator`:** Nur gueltige Operatoren oder NULL
 - **`chk_direction`:** Nur `up`, `down` oder NULL
 - **`UNIQUE(model_id)`:** Ein Modell kann nur einmal aktiv sein
 
 ### Indizes:
 
-1. **`idx_active_models_active`** (Partial Index)
-   - Spalte: `is_active`
-   - Filter: `WHERE is_active = true`
-   - Zweck: Schnelle Abfrage aktiver Modelle
-
-2. **`idx_active_models_model_id`**
-   - Spalte: `model_id`
-   - Zweck: Schnelle Suche nach Modell-ID
-
-3. **`idx_active_models_custom_name`** (Partial Index)
-   - Spalte: `custom_name`
-   - Filter: `WHERE custom_name IS NOT NULL`
-   - Zweck: Suche nach umbenannten Modellen
-
-### Beispiel-Daten:
-
-```json
-{
-  "id": 1,
-  "model_id": 42,
-  "model_name": "XGBoost 5min 30% Pump",
-  "model_type": "xgboost",
-  "target_variable": "price_close",
-  "target_operator": null,
-  "target_value": null,
-  "future_minutes": 5,
-  "price_change_percent": 30.0,
-  "target_direction": "up",
-  "features": ["price_open", "price_high", "price_low", "price_close", "volume_sol"],
-  "phases": [1, 2],
-  "params": {
-    "n_estimators": 100,
-    "max_depth": 5,
-    "use_engineered_features": true
-  },
-  "local_model_path": "/app/models/model_42.pkl",
-  "is_active": true,
-  "total_predictions": 1523,
-  "custom_name": "Mein Pump-Detector"
-}
-```
+| Index | Spalten | Zweck |
+|-------|---------|-------|
+| `idx_active_models_active` | `is_active` (WHERE true) | Schnelle Abfrage aktiver Modelle |
+| `idx_active_models_model_id` | `model_id` | Suche nach Modell-ID |
+| `idx_active_models_custom_name` | `custom_name` (WHERE NOT NULL) | Suche nach umbenannten Modellen |
+| `idx_active_models_coin_filter` | `coin_filter_mode` | Filter nach Coin-Modus |
 
 ---
 
-## 📑 Tabelle 2: `predictions`
+## Tabelle 2: `predictions`
 
 ### Zweck
-Speichert **alle Vorhersagen**, die der Prediction Service erstellt hat.
+Speichert alle Vorhersagen (Legacy-Tabelle, wird weiterhin befuellt).
 
 ### Felder:
 
 | Feld | Typ | Beschreibung |
 |------|-----|--------------|
-| `id` | BIGSERIAL | Primärschlüssel |
+| `id` | BIGSERIAL | Primaerschluessel |
 | `coin_id` | VARCHAR(255) | Coin-ID (mint) |
-| `data_timestamp` | TIMESTAMP | Zeitstempel der Daten (nicht Vorhersage-Zeit!) |
+| `data_timestamp` | TIMESTAMP | Zeitstempel der Daten |
 | `model_id` | BIGINT | Referenz zu `ml_models.id` (kein FK!) |
-| `active_model_id` | BIGINT | FK zu `prediction_active_models.id` (kann NULL sein) |
-| `prediction` | INTEGER | Vorhersage: `0` (negativ) oder `1` (positiv) |
-| `probability` | NUMERIC(5,4) | Wahrscheinlichkeit (0.0 - 1.0) |
+| `active_model_id` | BIGINT | FK zu `prediction_active_models.id` |
+| `prediction` | INTEGER | `0` (negativ) oder `1` (positiv) |
+| `probability` | NUMERIC(5,4) | Wahrscheinlichkeit (0.0-1.0) |
 | `phase_id_at_time` | INTEGER | Phase zum Zeitpunkt der Vorhersage |
-| `features` | JSONB | Features (optional, für Debugging) |
-| `prediction_duration_ms` | INTEGER | Dauer der Vorhersage in Millisekunden |
-| `created_at` | TIMESTAMP | Wann wurde Vorhersage erstellt? |
-
-### Constraints:
-
-- **`prediction IN (0, 1)`:** Nur 0 oder 1 erlaubt
-- **`probability >= 0.0 AND probability <= 1.0`:** Gültiger Wahrscheinlichkeitswert
+| `features` | JSONB | Features (optional) |
+| `prediction_duration_ms` | INTEGER | Dauer in Millisekunden |
+| `created_at` | TIMESTAMP | Erstellt am |
 
 ### Indizes:
 
-1. **`idx_predictions_coin_timestamp`**
-   - Spalten: `coin_id`, `data_timestamp DESC`
-   - Zweck: Schnelle Abfrage neuester Vorhersagen pro Coin
-
-2. **`idx_predictions_model`**
-   - Spalten: `model_id`, `created_at DESC`
-   - Zweck: Alle Vorhersagen eines Modells
-
-3. **`idx_predictions_active_model`**
-   - Spalten: `active_model_id`, `created_at DESC`
-   - Zweck: Vorhersagen eines aktiven Modells
-
-4. **`idx_predictions_created`**
-   - Spalte: `created_at DESC`
-   - Zweck: Neueste Vorhersagen (allgemein)
-
-### Beispiel-Daten:
-
-```json
-{
-  "id": 12345,
-  "coin_id": "ABC123...",
-  "data_timestamp": "2025-01-XX 12:00:00+00",
-  "model_id": 42,
-  "active_model_id": 1,
-  "prediction": 1,
-  "probability": 0.8542,
-  "phase_id_at_time": 1,
-  "prediction_duration_ms": 45,
-  "created_at": "2025-01-XX 12:00:01+00"
-}
-```
+| Index | Spalten | Zweck |
+|-------|---------|-------|
+| `idx_predictions_coin_timestamp` | `coin_id`, `data_timestamp DESC` | Neueste Vorhersagen pro Coin |
+| `idx_predictions_model` | `model_id`, `created_at DESC` | Vorhersagen eines Modells |
+| `idx_predictions_active_model` | `active_model_id`, `created_at DESC` | Vorhersagen eines aktiven Modells |
+| `idx_predictions_created` | `created_at DESC` | Neueste Vorhersagen |
 
 ---
 
-## 📑 Tabelle 3: `prediction_webhook_log`
+## Tabelle 3: `prediction_webhook_log`
 
 ### Zweck
-Loggt **alle n8n Webhook-Aufrufe** für Debugging und Monitoring.
+Loggt alle n8n Webhook-Aufrufe fuer Debugging und Monitoring.
 
 ### Felder:
 
 | Feld | Typ | Beschreibung |
 |------|-----|--------------|
-| `id` | BIGSERIAL | Primärschlüssel |
+| `id` | BIGSERIAL | Primaerschluessel |
 | `coin_id` | VARCHAR(255) | Coin-ID |
 | `data_timestamp` | TIMESTAMP | Zeitstempel der Daten |
 | `webhook_url` | TEXT | n8n Webhook-URL |
 | `payload` | JSONB | Gesendeter JSON-Payload |
-| `response_status` | INTEGER | HTTP-Status-Code (200, 404, 500, etc.) |
-| `response_body` | TEXT | Response-Body von n8n |
-| `error_message` | TEXT | Fehler-Message (falls Fehler) |
-| `created_at` | TIMESTAMP | Wann wurde Webhook aufgerufen? |
+| `response_status` | INTEGER | HTTP-Status-Code |
+| `response_body` | TEXT | Response-Body |
+| `error_message` | TEXT | Fehler-Message |
+| `created_at` | TIMESTAMP | Erstellt am |
+
+---
+
+## Tabelle 4: `model_predictions`
+
+### Zweck
+Speichert ALLE Vorhersagen mit klaren Tags (negativ/positiv/alert) und Status (aktiv/inaktiv). Ersetzt die komplexe Struktur aus predictions + alert_evaluations durch EINE einfache Tabelle. Enthaelt ATH-Tracking und Evaluation-Ergebnisse.
+
+### Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | BIGSERIAL | Primaerschluessel |
+| **Basis** | | |
+| `coin_id` | VARCHAR(255) | Coin-ID (mint) |
+| `model_id` | BIGINT | Referenz zu `ml_models.id` |
+| `active_model_id` | BIGINT | FK zu `prediction_active_models.id` |
+| **Vorhersage** | | |
+| `prediction` | INTEGER | `0` (negativ) oder `1` (positiv) |
+| `probability` | NUMERIC(5,4) | Wahrscheinlichkeit (0.0-1.0) |
+| `tag` | VARCHAR(20) | `negativ`, `positiv` oder `alert` (automatisch berechnet) |
+| `status` | VARCHAR(20) | `aktiv` (wartet) oder `inaktiv` (ausgewertet) |
+| **Zeitstempel** | | |
+| `prediction_timestamp` | TIMESTAMP | Wann wurde Vorhersage gemacht |
+| `evaluation_timestamp` | TIMESTAMP | Wann soll ausgewertet werden |
+| `evaluated_at` | TIMESTAMP | Wann wurde tatsaechlich ausgewertet |
+| **Werte bei Vorhersage** | | |
+| `price_close_at_prediction` | NUMERIC(20,8) | Preis bei Vorhersage |
+| `price_open_at_prediction` | NUMERIC(20,8) | Open-Preis |
+| `price_high_at_prediction` | NUMERIC(20,8) | High-Preis |
+| `price_low_at_prediction` | NUMERIC(20,8) | Low-Preis |
+| `market_cap_at_prediction` | NUMERIC(20,2) | Market Cap |
+| `volume_at_prediction` | NUMERIC(20,2) | Volume |
+| `phase_id_at_prediction` | INTEGER | Phase-ID |
+| **Werte bei Evaluation** | | |
+| `price_close_at_evaluation` | NUMERIC(20,8) | Preis bei Evaluation |
+| `price_open_at_evaluation` | NUMERIC(20,8) | Open-Preis |
+| `price_high_at_evaluation` | NUMERIC(20,8) | High-Preis |
+| `price_low_at_evaluation` | NUMERIC(20,8) | Low-Preis |
+| `market_cap_at_evaluation` | NUMERIC(20,2) | Market Cap |
+| `volume_at_evaluation` | NUMERIC(20,2) | Volume |
+| `phase_id_at_evaluation` | INTEGER | Phase-ID |
+| **ATH-Tracking** | | |
+| `ath_price` | NUMERIC(20,8) | Hoechster Preis seit Vorhersage |
+| `ath_price_timestamp` | TIMESTAMP | Zeitpunkt des ATH |
+| `ath_change_pct` | NUMERIC(10,4) | ATH-Aenderung in % |
+| `atl_price` | NUMERIC(20,8) | Niedrigster Preis seit Vorhersage |
+| `atl_price_timestamp` | TIMESTAMP | Zeitpunkt des ATL |
+| `atl_change_pct` | NUMERIC(10,4) | ATL-Aenderung in % |
+| **Evaluation** | | |
+| `actual_price_change_pct` | NUMERIC(10,4) | Tatsaechliche Preisaenderung in % |
+| `evaluation_result` | VARCHAR(20) | `success`, `failed` oder `not_applicable` |
+| `evaluation_note` | TEXT | Zusaetzliche Info |
+| **Meta** | | |
+| `created_at` | TIMESTAMP | Erstellt am |
+| `updated_at` | TIMESTAMP | Aktualisiert am |
+
+### Tag-Logik:
+- `probability < 0.5` -> `negativ`
+- `probability >= 0.5 AND probability < alert_threshold` -> `positiv`
+- `probability >= alert_threshold` -> `alert`
+
+### Status-Logik:
+- `aktiv` = Wartet auf Auswertung (`evaluation_timestamp` noch nicht erreicht)
+- `inaktiv` = Ausgewertet (Ergebnis eingetragen)
 
 ### Indizes:
 
-1. **`idx_webhook_log_created`**
-   - Spalte: `created_at DESC`
-   - Zweck: Neueste Webhook-Aufrufe
-
-2. **`idx_webhook_log_status`** (Partial Index)
-   - Spalte: `response_status`
-   - Filter: `WHERE response_status IS NOT NULL`
-   - Zweck: Fehler-Analyse (nur fehlgeschlagene Aufrufe)
-
-### Beispiel-Daten:
-
-```json
-{
-  "id": 567,
-  "coin_id": "ABC123...",
-  "data_timestamp": "2025-01-XX 12:00:00+00",
-  "webhook_url": "https://n8n.example.com/webhook/ml-predictions",
-  "payload": {
-    "coin_id": "ABC123...",
-    "timestamp": "2025-01-XX 12:00:00+00",
-    "predictions": [...],
-    "metadata": {...}
-  },
-  "response_status": 200,
-  "response_body": "OK",
-  "error_message": null,
-  "created_at": "2025-01-XX 12:00:01+00"
-}
-```
+| Index | Spalten | Zweck |
+|-------|---------|-------|
+| `idx_model_predictions_coin_timestamp` | `coin_id`, `prediction_timestamp DESC` | Neueste Vorhersagen pro Coin |
+| `idx_model_predictions_model` | `model_id`, `prediction_timestamp DESC` | Vorhersagen eines Modells |
+| `idx_model_predictions_active_model` | `active_model_id`, `prediction_timestamp DESC` | Vorhersagen eines aktiven Modells |
+| `idx_model_predictions_status` | `status` (WHERE `aktiv`) | Offene Vorhersagen |
+| `idx_model_predictions_tag` | `tag` | Filter nach Tag |
+| `idx_model_predictions_evaluation_timestamp` | `evaluation_timestamp` (WHERE `aktiv`) | Faellige Evaluierungen |
 
 ---
 
-## 🔗 Beziehungen zwischen Tabellen
+## Tabelle 5: `alert_evaluations`
 
-### 1. `prediction_active_models` ↔ `ml_models`
+### Zweck
+Speichert Alert-Auswertungen mit umfassenden Marktdaten zum Zeitpunkt des Alerts und der Evaluation. Unterstuetzt zeitbasierte und klassische Vorhersagen.
+
+### Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | BIGSERIAL | Primaerschluessel |
+| `prediction_id` | BIGINT | FK zu `predictions.id` |
+| `coin_id` | VARCHAR(255) | Coin-ID |
+| `model_id` | BIGINT | Modell-ID |
+| **Typ** | | |
+| `prediction_type` | VARCHAR(20) | `time_based` oder `classic` |
+| `target_variable` | VARCHAR(100) | z.B. `price_close` (time_based) |
+| `future_minutes` | INTEGER | Vorhersage-Horizont (time_based) |
+| `price_change_percent` | NUMERIC(10,4) | Ziel-Aenderung (time_based) |
+| `target_direction` | VARCHAR(10) | `up` oder `down` (time_based) |
+| `target_operator` | VARCHAR(10) | Operator (classic) |
+| `target_value` | NUMERIC(20,2) | Ziel-Wert (classic) |
+| **Werte bei Alert** | | |
+| `alert_timestamp` | TIMESTAMP | Zeitpunkt des Alerts |
+| `price_close_at_alert` | NUMERIC(20,8) | Preis bei Alert |
+| `volume_sol_at_alert` | NUMERIC(20,2) | Volume bei Alert |
+| `phase_id_at_alert` | INTEGER | Phase bei Alert |
+| *(weitere Marktdaten)* | | |
+| **Werte bei Evaluation** | | |
+| `evaluation_timestamp` | TIMESTAMP | alert_timestamp + future_minutes |
+| `price_close_at_evaluation` | NUMERIC(20,8) | Preis bei Evaluation |
+| *(weitere Marktdaten)* | | |
+| **Ergebnis** | | |
+| `actual_price_change_pct` | NUMERIC(10,4) | Tatsaechliche Preisaenderung |
+| `status` | VARCHAR(20) | `pending`, `success`, `failed`, `expired`, `not_applicable` |
+| `evaluated_at` | TIMESTAMP | Wann ausgewertet |
+| `evaluation_note` | TEXT | Zusaetzliche Info |
+| **ATH-Tracking** | | |
+| `ath_price` | NUMERIC(20,8) | Hoechster Preis seit Alert |
+| `ath_timestamp` | TIMESTAMP | Zeitpunkt des ATH |
+| `ath_change_pct` | NUMERIC(10,4) | ATH-Aenderung in % |
+| `atl_price` | NUMERIC(20,8) | Niedrigster Preis seit Alert |
+| `atl_timestamp` | TIMESTAMP | Zeitpunkt des ATL |
+| `atl_change_pct` | NUMERIC(10,4) | ATL-Aenderung in % |
+
+### Status-Werte:
+- `pending` - Wartet auf Auswertung
+- `success` - Vorhersage war korrekt
+- `failed` - Vorhersage war falsch
+- `expired` - Keine Daten zum Evaluationszeitpunkt
+- `not_applicable` - Nicht auswertbar (z.B. Modell geloescht)
+
+### Indizes:
+
+| Index | Spalten | Zweck |
+|-------|---------|-------|
+| `idx_alert_evaluations_coin_timestamp` | `coin_id`, `alert_timestamp ASC` | Aelteste zuerst |
+| `idx_alert_evaluations_status` | `status` (WHERE `pending`) | Offene Evaluierungen |
+| `idx_alert_evaluations_prediction` | `prediction_id` | Join mit predictions |
+| `idx_alert_evaluations_evaluation_timestamp` | `evaluation_timestamp` (WHERE `pending`) | Faellige Evaluierungen |
+
+---
+
+## Tabelle 6: `coin_scan_cache`
+
+### Zweck
+Cache fuer zuletzt gescannte Coins und deren Ignore-Status. Verhindert zu haeufige Scans desselben Coins pro Modell.
+
+### Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | BIGSERIAL | Primaerschluessel |
+| `coin_id` | VARCHAR(255) | Coin-Mint-Adresse |
+| `active_model_id` | BIGINT | FK zu `prediction_active_models.id` (CASCADE) |
+| `last_scan_at` | TIMESTAMP | Letzte Verarbeitung |
+| `last_prediction` | INTEGER | Letzte Vorhersage (0/1) |
+| `last_probability` | NUMERIC(5,4) | Letzte Wahrscheinlichkeit |
+| `was_alert` | BOOLEAN | Ob Alert ausgeloest wurde |
+| `ignore_until` | TIMESTAMP | Bis wann ignorieren (NULL = nicht) |
+| `ignore_reason` | VARCHAR(20) | `bad`, `positive` oder `alert` |
+| `created_at` | TIMESTAMP | Erstellt am |
+| `updated_at` | TIMESTAMP | Aktualisiert am |
+
+### Constraints:
+- **`UNIQUE(coin_id, active_model_id)`** - Ein Coin kann nur einmal pro Modell gecached werden
+- **FK** `active_model_id` -> `prediction_active_models.id` ON DELETE CASCADE
+
+### Indizes:
+
+| Index | Spalten | Zweck |
+|-------|---------|-------|
+| `idx_coin_scan_cache_coin_model` | `coin_id`, `active_model_id` | Schnelle Lookup |
+| `idx_coin_scan_cache_ignore_until` | `ignore_until` (WHERE NOT NULL) | Aktive Ignores |
+| `idx_coin_scan_cache_last_scan` | `last_scan_at DESC` | Neueste Scans |
+| `idx_coin_scan_cache_alerts` | `was_alert` (WHERE true) | Alert-Coins |
+
+---
+
+## Beziehungen zwischen Tabellen
+
+### `prediction_active_models` <-> `ml_models`
 - **Beziehung:** Logische Referenz (kein Foreign Key!)
 - **Grund:** Separater Server, keine direkte DB-Verbindung
-- **Verwendung:** `model_id` in `prediction_active_models` referenziert `ml_models.id`
 
-### 2. `predictions` ↔ `prediction_active_models`
+### `predictions` <-> `prediction_active_models`
 - **Beziehung:** Foreign Key (`active_model_id`)
-- **Verhalten:** `ON DELETE SET NULL` (wenn Modell gelöscht wird, bleibt Vorhersage erhalten)
-- **Verwendung:** Verknüpfung Vorhersage mit aktivem Modell
+- **Verhalten:** `ON DELETE SET NULL`
 
-### 3. `predictions` ↔ `ml_models`
-- **Beziehung:** Logische Referenz (kein Foreign Key!)
-- **Grund:** Separater Server
-- **Verwendung:** `model_id` in `predictions` referenziert `ml_models.id`
+### `model_predictions` <-> `prediction_active_models`
+- **Beziehung:** Logische Referenz (`active_model_id`)
 
----
+### `alert_evaluations` <-> `predictions`
+- **Beziehung:** Foreign Key (`prediction_id`)
+- **Verhalten:** `ON DELETE CASCADE`
 
-## 📊 Performance-Optimierungen
-
-### Indizes-Strategie:
-
-1. **Partial Indizes:**
-   - Nur für häufig abgefragte Teilmengen (z.B. `is_active = true`)
-   - Spart Speicher und verbessert Performance
-
-2. **Composite Indizes:**
-   - Kombinationen von Spalten für häufige Queries
-   - Sortierung (`DESC`) für neueste Einträge zuerst
-
-3. **JSONB Indizes:**
-   - JSONB-Felder können mit GIN-Indizes indexiert werden (falls nötig)
-   - Aktuell nicht implementiert (kann später hinzugefügt werden)
-
-### Wartung:
-
-- **VACUUM:** Regelmäßig ausführen für optimale Performance
-- **ANALYZE:** Statistiken aktualisieren
-- **Index-Monitoring:** Prüfe ob Indizes genutzt werden
+### `coin_scan_cache` <-> `prediction_active_models`
+- **Beziehung:** Foreign Key (`active_model_id`)
+- **Verhalten:** `ON DELETE CASCADE`
 
 ---
 
-## 🧪 Test-Queries
+## Migrations
 
-### 1. Prüfe ob Tabellen existieren:
+Alle Migrations befinden sich in `sql/migrations/`:
+
+| Migration | Beschreibung |
+|-----------|--------------|
+| `create_model_predictions.sql` | model_predictions Tabelle |
+| `create_alert_evaluations.sql` | alert_evaluations Tabelle |
+| `create_coin_scan_cache.sql` | coin_scan_cache Tabelle |
+| `add_alert_threshold.sql` | alert_threshold Spalte |
+| `add_n8n_settings.sql` | n8n Webhook-Spalten |
+| `add_alert_config.sql` | coin_filter_mode, coin_whitelist |
+| `add_coin_ignore_settings.sql` | ignore_*_seconds Spalten |
+| `add_max_log_entries_per_coin.sql` | max_log_entries Spalten |
+| `add_performance_metrics.sql` | Training-Metriken Spalten |
+| `add_ath_tracking.sql` | ATH-Tracking fuer alert_evaluations |
+| `add_ath_tracking_model_predictions.sql` | ATH-Tracking fuer model_predictions |
+| `add_send_ignored_to_n8n.sql` | send_ignored_to_n8n Spalte |
+| `add_min_scan_interval.sql` | min_scan_interval_seconds Spalte |
+| `migrate_n8n_send_mode_to_array.sql` | n8n_send_mode VARCHAR -> JSONB Array |
+| `fix_price_precision_model_predictions.sql` | Preis-Precision erhoehen |
+
+---
+
+## Test-Queries
+
+### Tabellen pruefen:
 ```sql
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name IN ('prediction_active_models', 'predictions', 'prediction_webhook_log')
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name IN (
+    'prediction_active_models', 'predictions', 'prediction_webhook_log',
+    'model_predictions', 'alert_evaluations', 'coin_scan_cache'
+)
 ORDER BY table_name;
 ```
 
-### 2. Prüfe Trigger:
+### Aktive Modelle:
 ```sql
-SELECT trigger_name, event_manipulation, event_object_table
-FROM information_schema.triggers
-WHERE trigger_name = 'coin_metrics_insert_trigger';
-```
-
-### 3. Aktive Modelle abfragen:
-```sql
-SELECT id, model_id, model_name, model_type, is_active, total_predictions
+SELECT id, model_id, model_name, model_type, is_active,
+       total_predictions, alert_threshold, n8n_enabled
 FROM prediction_active_models
 WHERE is_active = true;
 ```
 
-### 4. Neueste Vorhersagen:
+### Offene Evaluierungen:
 ```sql
-SELECT p.id, p.coin_id, p.prediction, p.probability, p.created_at, m.model_name
-FROM predictions p
-LEFT JOIN prediction_active_models m ON p.active_model_id = m.id
-ORDER BY p.created_at DESC
-LIMIT 10;
+SELECT COUNT(*), active_model_id
+FROM model_predictions
+WHERE status = 'aktiv' AND evaluation_timestamp <= NOW()
+GROUP BY active_model_id;
 ```
 
-### 5. Webhook-Fehler analysieren:
+### Alert-Statistiken:
 ```sql
-SELECT COUNT(*), response_status, error_message
-FROM prediction_webhook_log
-WHERE response_status != 200 OR response_status IS NULL
-GROUP BY response_status, error_message;
+SELECT
+    status,
+    COUNT(*) as count,
+    AVG(actual_price_change_pct) as avg_change
+FROM alert_evaluations
+WHERE status != 'pending'
+GROUP BY status;
 ```
 
 ---
 
-## ⚠️ Wichtige Hinweise
+## Wichtige Hinweise
 
-### 1. **Keine Foreign Keys zu `ml_models`:**
-- Prediction Service und Training Service sind **separate Server**
-- Keine direkte DB-Verbindung zwischen beiden
-- Referenzen sind **logisch** (über `model_id`)
+### 1. Keine Foreign Keys zu `ml_models`
+- Prediction Service und Training Service sind separate Server
+- Referenzen sind logisch (ueber `model_id`)
 
-### 2. **Trigger auf bestehender Tabelle:**
-- Trigger wird auf **bestehender** `coin_metrics` Tabelle erstellt
-- **Keine Änderungen** an `coin_metrics` selbst
-- Trigger kann jederzeit entfernt werden ohne Datenverlust
+### 2. Trigger auf bestehender Tabelle
+- Trigger auf `coin_metrics` kann jederzeit entfernt werden ohne Datenverlust
 
-### 3. **JSONB Felder:**
-- Nutzen PostgreSQL JSONB für flexible Datenstrukturen
-- Können mit SQL-Queries durchsucht werden
+### 3. JSONB Felder
+- `features`, `params`, `n8n_send_mode`, `coin_whitelist` verwenden JSONB
 - Beispiel: `SELECT * FROM prediction_active_models WHERE features @> '["price_close"]'::jsonb;`
 
-### 4. **Zeitzone:**
+### 4. Zeitzone
 - Alle Timestamps nutzen `TIMESTAMP WITH TIME ZONE`
 - Immer UTC speichern
-- Konvertierung bei Anzeige in UI
 
 ---
 
-## 🔄 Migration & Updates
-
-### Schema aktualisieren:
-
-Falls Schema-Änderungen nötig sind, erstelle ein **Migration-Script**:
-
-```sql
--- Beispiel: Neue Spalte hinzufügen
-ALTER TABLE prediction_active_models 
-ADD COLUMN IF NOT EXISTS alert_threshold NUMERIC(5,4) DEFAULT 0.7;
-```
-
-### Trigger neu erstellen:
-
-```sql
--- Trigger entfernen
-DROP TRIGGER IF EXISTS coin_metrics_insert_trigger ON coin_metrics;
-
--- Trigger neu erstellen (mit aktualisierter Funktion)
-CREATE TRIGGER coin_metrics_insert_trigger
-    AFTER INSERT ON coin_metrics
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_coin_metrics_insert();
-```
-
----
-
-## 📚 Weitere Ressourcen
-
-- **PostgreSQL LISTEN/NOTIFY:** https://www.postgresql.org/docs/current/sql-notify.html
-- **PostgreSQL Triggers:** https://www.postgresql.org/docs/current/triggers.html
-- **JSONB in PostgreSQL:** https://www.postgresql.org/docs/current/datatype-json.html
-
----
-
-**Erstellt:** 2025-01-XX  
-**Letzte Aktualisierung:** 2025-01-XX
-
+**Erstellt:** Januar 2025
+**Letzte Aktualisierung:** Februar 2026

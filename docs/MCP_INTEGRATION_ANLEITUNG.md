@@ -1,664 +1,473 @@
-# MCP Server Integration in FastAPI
+# MCP Server Integration in FastAPI - Anleitung
 
-Diese Anleitung beschreibt, wie ein MCP (Model Context Protocol) Server in eine bestehende FastAPI-Anwendung integriert wird. Das MCP-Protokoll von Anthropic ermöglicht KI-Clients wie Claude Code den direkten Zugriff auf Service-Funktionen.
+Diese Anleitung beschreibt, wie ein MCP (Model Context Protocol) Server mit der **offiziellen MCP SDK** in eine bestehende FastAPI-Anwendung integriert wird. Basierend auf der funktionierenden Implementierung im pump-server.
 
-## 1. Projektstruktur
+> **Hinweis:** Diese Anleitung zeigt echten, funktionierenden Code. Sie kann direkt als Vorlage fuer andere FastAPI-Projekte verwendet werden.
 
-```
-backend/
-├── app/
-│   ├── mcp/                      # Neues MCP-Modul
-│   │   ├── __init__.py           # Modul-Initialisierung
-│   │   ├── server.py             # MCP Server Hauptlogik
-│   │   ├── routes.py             # FastAPI Endpoints
-│   │   └── tools/                # Tool-Definitionen
-│   │       ├── __init__.py
-│   │       ├── models.py         # Model-bezogene Tools
-│   │       ├── predictions.py    # Prediction-Tools
-│   │       ├── configuration.py  # Config-Tools
-│   │       └── system.py         # System-Tools
-│   ├── main.py                   # FastAPI App (wird erweitert)
-│   └── ...
-├── requirements.txt              # Dependencies (wird erweitert)
-```
+---
 
-## 2. Dependencies hinzufügen
+## 1. Voraussetzungen & Dependencies
 
-**Datei: `backend/requirements.txt`**
+**`requirements.txt`:**
 
 ```txt
-# Bestehende Dependencies...
-
 # MCP Server (Model Context Protocol)
 mcp>=1.0.0
-sse-starlette>=1.6.5
 
-# WICHTIG: FastAPI und uvicorn müssen aktualisiert werden wegen anyio>=4.5
+# WICHTIG: FastAPI und Uvicorn muessen aktuell sein wegen anyio>=4.5
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 anyio>=4.5.0
 pydantic>=2.5.0
+
+# SSE-Starlette wird von mcp als Dependency mitgebracht,
+# aber starlette.routing.Route wird direkt verwendet.
 ```
 
-**Hinweis:** MCP erfordert `anyio>=4.5`, was mit älteren FastAPI-Versionen (< 0.115) nicht kompatibel ist.
+**Wichtig:** Die MCP SDK erfordert `anyio>=4.5`, was mit aelteren FastAPI-Versionen (< 0.115) nicht kompatibel ist.
 
-## 3. MCP-Modul erstellen
+---
 
-### 3.1 `backend/app/mcp/__init__.py`
+## 2. Projektstruktur
 
-```python
-"""
-MCP (Model Context Protocol) Server Module
-
-Ermöglicht KI-Clients wie Claude Code den direkten Zugriff auf Service-Funktionen.
-"""
-
-from .server import MCPServer
-from .routes import router
-
-__all__ = ["MCPServer", "router"]
+```
+backend/
+├── app/
+│   ├── mcp/                      # MCP-Modul
+│   │   ├── __init__.py           # Modul-Initialisierung
+│   │   ├── server.py             # MCP Server mit offizieller SDK
+│   │   ├── routes.py             # SSE Transport + FastAPI Endpoints
+│   │   └── tools/                # Tool-Implementierungen
+│   │       ├── __init__.py       # Re-Exports aller Tools
+│   │       ├── models.py         # Model-Management Tools
+│   │       ├── predictions.py    # Prediction Tools
+│   │       ├── configuration.py  # Config Tools
+│   │       ├── alerts.py         # Alert Tools
+│   │       └── system.py         # System Tools
+│   ├── main.py                   # FastAPI App (wird erweitert)
+│   └── ...
 ```
 
-### 3.2 `backend/app/mcp/server.py`
+---
+
+## 3. Server erstellen (`server.py`)
+
+Die offizielle MCP SDK stellt eine `Server`-Klasse bereit, die mit Decoratorn arbeitet:
 
 ```python
 """
 MCP Server Implementation
-
-Hauptlogik für den MCP Server mit Tool-Registry und Dispatcher.
 """
-
 import json
-import uuid
-from typing import Any, Dict, List, Optional, Callable
-from dataclasses import dataclass, field
-from datetime import datetime
+import logging
+from typing import Any, Sequence
 
-from app.utils.logging_config import get_logger
+from mcp.server import Server
+from mcp.types import (
+    Tool,
+    TextContent,
+    ImageContent,
+    EmbeddedResource,
+)
 
-logger = get_logger(__name__)
+# Import Tool-Implementierungen
+from app.mcp.tools import (
+    list_active_models,
+    predict_coin,
+    health_check,
+    # ... weitere Tools
+)
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
-class MCPTool:
-    """Definition eines MCP Tools"""
-    name: str
-    description: str
-    parameters: Dict[str, Any]
-    handler: Callable
+def create_mcp_server() -> Server:
+    """
+    Creates and configures the MCP server instance.
+    """
+    server = Server("dein-service-mcp")
 
-
-@dataclass
-class MCPServer:
-    """MCP Server mit Tool-Registry"""
-
-    name: str = "pump-server"
-    version: str = "1.0.0"
-    tools: Dict[str, MCPTool] = field(default_factory=dict)
-    sessions: Dict[str, Dict] = field(default_factory=dict)
-
-    def register_tool(
-        self,
-        name: str,
-        description: str,
-        parameters: Dict[str, Any],
-        handler: Callable
-    ) -> None:
-        """Registriert ein neues Tool"""
-        self.tools[name] = MCPTool(
-            name=name,
-            description=description,
-            parameters=parameters,
-            handler=handler
-        )
-        logger.debug(f"Tool registriert: {name}")
-
-    def get_tools_list(self) -> List[Dict[str, Any]]:
-        """Gibt Liste aller Tools für MCP zurück"""
+    @server.list_tools()
+    async def handle_list_tools() -> list[Tool]:
+        """Returns the list of available tools."""
         return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": {
+            Tool(
+                name="list_active_models",
+                description="Liste aller aktiven ML-Modelle",
+                inputSchema={
                     "type": "object",
-                    "properties": tool.parameters.get("properties", {}),
-                    "required": tool.parameters.get("required", [])
+                    "properties": {
+                        "include_inactive": {
+                            "type": "boolean",
+                            "description": "Auch inaktive Modelle anzeigen",
+                            "default": False
+                        }
+                    },
+                    "required": []
                 }
-            }
-            for tool in self.tools.values()
+            ),
+            Tool(
+                name="predict_coin",
+                description="Macht eine Vorhersage fuer einen Coin",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "coin_id": {
+                            "type": "string",
+                            "description": "Coin-ID (Mint-Adresse)"
+                        }
+                    },
+                    "required": ["coin_id"]
+                }
+            ),
+            # ... weitere Tools
         ]
 
-    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Ruft ein Tool auf und gibt das Ergebnis zurück"""
-        if name not in self.tools:
-            return {
-                "isError": True,
-                "content": [{"type": "text", "text": f"Tool nicht gefunden: {name}"}]
-            }
-
-        tool = self.tools[name]
+    @server.call_tool()
+    async def handle_call_tool(
+        name: str, arguments: dict | None
+    ) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+        """Dispatches tool calls to implementations."""
+        args = arguments or {}
 
         try:
-            result = await tool.handler(**arguments)
-
-            # Ergebnis als JSON-Text formatieren
-            if isinstance(result, dict) or isinstance(result, list):
-                text_content = json.dumps(result, indent=2, default=str, ensure_ascii=False)
+            if name == "list_active_models":
+                result = await list_active_models(
+                    include_inactive=args.get("include_inactive", False)
+                )
+            elif name == "predict_coin":
+                result = await predict_coin(coin_id=args["coin_id"])
+            # ... weitere Tools
             else:
-                text_content = str(result)
+                result = {"error": f"Unknown tool: {name}"}
 
-            return {
-                "content": [{"type": "text", "text": text_content}]
-            }
+            return [TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, default=str)
+            )]
 
         except Exception as e:
-            logger.error(f"Tool-Fehler {name}: {e}", exc_info=True)
-            return {
-                "isError": True,
-                "content": [{"type": "text", "text": f"Fehler: {str(e)}"}]
-            }
+            logger.error(f"Error calling tool {name}: {e}", exc_info=True)
+            return [TextContent(
+                type="text",
+                text=json.dumps({"success": False, "error": str(e)}, indent=2)
+            )]
 
-    def create_session(self) -> str:
-        """Erstellt eine neue MCP-Session"""
-        session_id = str(uuid.uuid4())
-        self.sessions[session_id] = {
-            "created_at": datetime.utcnow().isoformat(),
-            "initialized": False
-        }
-        logger.info(f"Neue MCP-Session: {session_id}")
-        return session_id
-
-    def get_session(self, session_id: str) -> Optional[Dict]:
-        """Holt Session-Daten"""
-        return self.sessions.get(session_id)
-
-    def mark_initialized(self, session_id: str) -> None:
-        """Markiert Session als initialisiert"""
-        if session_id in self.sessions:
-            self.sessions[session_id]["initialized"] = True
-
-    async def handle_message(self, session_id: str, message: Dict[str, Any]) -> Dict[str, Any]:
-        """Verarbeitet eine JSON-RPC Nachricht"""
-        method = message.get("method", "")
-        msg_id = message.get("id")
-        params = message.get("params", {})
-
-        logger.debug(f"MCP Message: {method} (Session: {session_id[:8]}...)")
-
-        # Initialize
-        if method == "initialize":
-            self.mark_initialized(session_id)
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {
-                        "tools": {}
-                    },
-                    "serverInfo": {
-                        "name": self.name,
-                        "version": self.version
-                    }
-                }
-            }
-
-        # Notifications (kein Response)
-        if method == "notifications/initialized":
-            return None
-
-        # Tools auflisten
-        if method == "tools/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {
-                    "tools": self.get_tools_list()
-                }
-            }
-
-        # Tool aufrufen
-        if method == "tools/call":
-            tool_name = params.get("name", "")
-            arguments = params.get("arguments", {})
-
-            result = await self.call_tool(tool_name, arguments)
-
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": result
-            }
-
-        # Ping
-        if method == "ping":
-            return {
-                "jsonrpc": "2.0",
-                "id": msg_id,
-                "result": {}
-            }
-
-        # Unbekannte Methode
-        return {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "error": {
-                "code": -32601,
-                "message": f"Method not found: {method}"
-            }
-        }
+    return server
 
 
-# Globale MCP Server Instanz
-mcp_server = MCPServer()
+# Singleton instance
+_mcp_server: Server | None = None
 
 
-def get_mcp_server() -> MCPServer:
-    """Gibt die globale MCP Server Instanz zurück"""
-    return mcp_server
+def get_mcp_server() -> Server:
+    """Returns the singleton MCP server instance."""
+    global _mcp_server
+    if _mcp_server is None:
+        _mcp_server = create_mcp_server()
+    return _mcp_server
+
+
+class PumpServerMCP:
+    """
+    Wrapper class for the MCP server.
+    Provides a cleaner interface for info/health endpoints.
+    """
+
+    def __init__(self):
+        self.server = get_mcp_server()
+
+    def get_tool_list(self) -> list[dict]:
+        """Returns list of tools with their schemas."""
+        return [
+            {"name": "list_active_models", "description": "Liste aktiver ML-Modelle"},
+            {"name": "predict_coin", "description": "Vorhersage fuer Coin"},
+            # ... alle Tools auflisten
+        ]
 ```
 
-### 3.3 `backend/app/mcp/routes.py`
+### Kernkonzepte
+
+| Konzept | Beschreibung |
+|---------|-------------|
+| `Server("name")` | Offizielle MCP Server-Instanz aus `mcp.server` |
+| `@server.list_tools()` | Decorator, der die Tool-Liste zurueckgibt |
+| `@server.call_tool()` | Decorator, der Tool-Aufrufe dispatched |
+| `Tool(name, description, inputSchema)` | Tool-Definition aus `mcp.types` |
+| `TextContent(type="text", text=...)` | Response-Format fuer Tool-Ergebnisse |
+| Singleton Pattern | Nur eine Server-Instanz pro Prozess |
+
+---
+
+## 4. SSE Transport Routes (`routes.py`)
+
+Die MCP-Kommunikation laeuft ueber SSE (Server-Sent Events). Die offizielle SDK stellt `SseServerTransport` bereit, das **direkt mit ASGI** arbeitet und FastAPIs Response-Handling umgeht.
 
 ```python
 """
-MCP Server FastAPI Routes
+MCP Routes for FastAPI
 
-Endpoints für SSE-Kommunikation und Server-Info.
+Uses the official MCP SDK's SseServerTransport for SSE handling.
 """
+import logging
+from typing import Any
 
-import json
-import asyncio
-from typing import Dict, Any
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sse_starlette.sse import EventSourceResponse
+from starlette.routing import Route
+from mcp.server.sse import SseServerTransport
 
-from app.utils.logging_config import get_logger
-from .server import get_mcp_server
+from app.mcp.server import get_mcp_server, PumpServerMCP
 
-# Tools importieren und registrieren
-from .tools import models, predictions, configuration, system
+logger = logging.getLogger(__name__)
 
-logger = get_logger(__name__)
+# SSE Transport - singleton
+_sse_transport: SseServerTransport | None = None
 
+
+def get_sse_transport() -> SseServerTransport:
+    """Returns the singleton SSE transport instance."""
+    global _sse_transport
+    if _sse_transport is None:
+        # Der Pfad ist der POST-Endpoint fuer Messages
+        _sse_transport = SseServerTransport("/mcp/messages/")
+    return _sse_transport
+
+
+async def handle_sse(request: Request):
+    """
+    Handle SSE connections for MCP.
+    Main entry point for MCP clients connecting via SSE.
+    """
+    logger.info("MCP SSE connection established")
+
+    server = get_mcp_server()
+    transport = get_sse_transport()
+
+    async with transport.connect_sse(
+        request.scope,
+        request.receive,
+        request._send
+    ) as streams:
+        await server.run(
+            streams[0],  # read stream
+            streams[1],  # write stream
+            server.create_initialization_options()
+        )
+
+
+async def handle_messages(request: Request):
+    """
+    Handle POST messages for MCP.
+    JSON-RPC messages from clients are sent here.
+    """
+    logger.debug("MCP message received")
+
+    transport = get_sse_transport()
+    await transport.handle_post_message(
+        request.scope,
+        request.receive,
+        request._send
+    )
+
+
+# Regular FastAPI router for /mcp/info and /mcp/health
 router = APIRouter(prefix="/mcp", tags=["MCP"])
 
 
-def register_all_tools():
-    """Registriert alle MCP Tools"""
-    server = get_mcp_server()
-
-    # Model-Tools
-    models.register_tools(server)
-
-    # Prediction-Tools
-    predictions.register_tools(server)
-
-    # Configuration-Tools
-    configuration.register_tools(server)
-
-    # System-Tools
-    system.register_tools(server)
-
-    logger.info(f"✅ {len(server.tools)} MCP Tools registriert")
-
-
-# Tools beim Import registrieren
-register_all_tools()
-
-
 @router.get("/info")
-async def mcp_info():
-    """MCP Server Informationen und Tool-Liste"""
-    server = get_mcp_server()
-
+async def mcp_info() -> dict[str, Any]:
+    """Returns MCP server information and tool list."""
+    mcp = PumpServerMCP()
     return {
-        "name": server.name,
-        "version": server.version,
-        "protocol": "MCP",
-        "transport": "SSE",
-        "tools_count": len(server.tools),
-        "tools": [
-            {
-                "name": tool.name,
-                "description": tool.description
-            }
-            for tool in server.tools.values()
-        ]
+        "name": "dein-service-mcp",
+        "version": "1.0.0",
+        "description": "MCP Server fuer deinen Service",
+        "transport": "sse",
+        "sse_endpoint": "/mcp/sse",
+        "messages_endpoint": "/mcp/messages/",
+        "tools": mcp.get_tool_list(),
+        "tools_count": len(mcp.get_tool_list()),
     }
 
 
 @router.get("/health")
 async def mcp_health():
-    """MCP Server Health Check"""
-    server = get_mcp_server()
-
-    return {
-        "status": "healthy",
-        "tools_registered": len(server.tools),
-        "active_sessions": len(server.sessions)
-    }
-
-
-@router.get("/sse")
-async def mcp_sse(request: Request):
-    """SSE Endpoint für MCP Client-Verbindungen"""
-    server = get_mcp_server()
-    session_id = server.create_session()
-
-    logger.info(f"🔌 Neue MCP SSE-Verbindung: {session_id[:8]}...")
-
-    async def event_generator():
-        # Endpoint-URL für POST-Messages senden
-        endpoint_url = f"/mcp/sse?session_id={session_id}"
-        yield {
-            "event": "endpoint",
-            "data": endpoint_url
-        }
-
-        # Verbindung offen halten
-        try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                await asyncio.sleep(30)
-                # Keepalive
-                yield {
-                    "event": "ping",
-                    "data": "{}"
-                }
-        except asyncio.CancelledError:
-            pass
-        finally:
-            logger.info(f"🔌 MCP SSE-Verbindung beendet: {session_id[:8]}...")
-
-    return EventSourceResponse(event_generator())
-
-
-@router.post("/sse")
-async def mcp_message(request: Request):
-    """Empfängt JSON-RPC Messages vom MCP Client"""
-    server = get_mcp_server()
-
-    # Session-ID aus Query-Parameter
-    session_id = request.query_params.get("session_id", "")
-
-    if not session_id or not server.get_session(session_id):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Invalid session"}
-        )
-
-    try:
-        body = await request.json()
-    except Exception as e:
-        return JSONResponse(
-            status_code=400,
-            content={"error": f"Invalid JSON: {e}"}
-        )
-
-    # Message verarbeiten
-    response = await server.handle_message(session_id, body)
-
-    if response is None:
-        # Notification - kein Response
-        return Response(status_code=202)
-
-    return JSONResponse(content=response)
-```
-
-### 3.4 Tools-Modul: `backend/app/mcp/tools/__init__.py`
-
-```python
-"""
-MCP Tools Module
-
-Enthält alle Tool-Definitionen für den MCP Server.
-"""
-
-from . import models
-from . import predictions
-from . import configuration
-from . import system
-
-__all__ = ["models", "predictions", "configuration", "system"]
-```
-
-### 3.5 Beispiel Tool-Datei: `backend/app/mcp/tools/models.py`
-
-```python
-"""
-MCP Tools für Model-Verwaltung
-"""
-
-from typing import Optional
-from app.database.models import (
-    get_active_models,
-    get_available_models,
-    import_model as db_import_model,
-    activate_model as db_activate_model,
-    deactivate_model as db_deactivate_model
-)
-
-
-def register_tools(server):
-    """Registriert alle Model-Tools"""
-
-    # Tool 1: Aktive Modelle auflisten
-    server.register_tool(
-        name="list_active_models",
-        description="Liste aller aktiven ML-Modelle mit Konfiguration",
-        parameters={
-            "properties": {},
-            "required": []
-        },
-        handler=list_active_models
-    )
-
-    # Tool 2: Verfügbare Modelle auflisten
-    server.register_tool(
-        name="list_available_models",
-        description="Verfügbare Modelle vom Training Service zum Import",
-        parameters={
-            "properties": {
-                "limit": {
-                    "type": "integer",
-                    "description": "Maximale Anzahl (Standard: 20)"
-                }
-            },
-            "required": []
-        },
-        handler=list_available_models
-    )
-
-    # Tool 3: Modell importieren
-    server.register_tool(
-        name="import_model",
-        description="Importiert ein Modell vom Training Service",
-        parameters={
-            "properties": {
-                "model_id": {
-                    "type": "integer",
-                    "description": "ID des Modells im Training Service"
-                }
-            },
-            "required": ["model_id"]
-        },
-        handler=import_model
-    )
-
-    # Tool 4: Modell-Details abrufen
-    server.register_tool(
-        name="get_model_details",
-        description="Detaillierte Informationen zu einem aktiven Modell",
-        parameters={
-            "properties": {
-                "active_model_id": {
-                    "type": "integer",
-                    "description": "ID des aktiven Modells"
-                }
-            },
-            "required": ["active_model_id"]
-        },
-        handler=get_model_details
-    )
-
-    # Tool 5: Modell aktivieren
-    server.register_tool(
-        name="activate_model",
-        description="Aktiviert ein pausiertes Modell",
-        parameters={
-            "properties": {
-                "active_model_id": {
-                    "type": "integer",
-                    "description": "ID des aktiven Modells"
-                }
-            },
-            "required": ["active_model_id"]
-        },
-        handler=activate_model
-    )
-
-    # Tool 6: Modell deaktivieren
-    server.register_tool(
-        name="deactivate_model",
-        description="Deaktiviert ein aktives Modell",
-        parameters={
-            "properties": {
-                "active_model_id": {
-                    "type": "integer",
-                    "description": "ID des aktiven Modells"
-                }
-            },
-            "required": ["active_model_id"]
-        },
-        handler=deactivate_model
-    )
-
-
-# Handler-Funktionen (rufen bestehende Service-Funktionen auf)
-
-async def list_active_models():
-    """Liste aller aktiven Modelle"""
-    models = await get_active_models()
-    return {
-        "count": len(models),
-        "models": models
-    }
-
-
-async def list_available_models(limit: int = 20):
-    """Verfügbare Modelle vom Training Service"""
-    models = await get_available_models(limit=limit)
-    return {
-        "count": len(models),
-        "models": models
-    }
-
-
-async def import_model(model_id: int):
-    """Importiert ein Modell"""
-    result = await db_import_model(model_id)
+    """Health check endpoint for MCP server."""
+    from app.mcp.tools.system import health_check
+    result = await health_check()
     return result
 
 
-async def get_model_details(active_model_id: int):
-    """Details zu einem Modell"""
-    models = await get_active_models()
-    model = next((m for m in models if m.get("id") == active_model_id), None)
+def get_sse_routes():
+    """
+    Returns SSE-specific routes that need direct ASGI handling.
 
-    if not model:
-        return {"error": f"Modell {active_model_id} nicht gefunden"}
-
-    return model
-
-
-async def activate_model(active_model_id: int):
-    """Aktiviert ein Modell"""
-    result = await db_activate_model(active_model_id)
-    return {"success": True, "message": f"Modell {active_model_id} aktiviert"}
-
-
-async def deactivate_model(active_model_id: int):
-    """Deaktiviert ein Modell"""
-    result = await db_deactivate_model(active_model_id)
-    return {"success": True, "message": f"Modell {active_model_id} deaktiviert"}
+    WICHTIG: Diese Routes umgehen FastAPIs Response-Handling,
+    weil SSE direkt auf das ASGI-Send-Interface streamen muss.
+    Deshalb werden sie als starlette.routing.Route erstellt,
+    nicht als FastAPI-Endpoints.
+    """
+    return [
+        Route("/mcp/sse", endpoint=handle_sse, methods=["GET"]),
+        Route("/mcp/messages/", endpoint=handle_messages, methods=["POST"]),
+    ]
 ```
 
-### 3.6 System-Tools: `backend/app/mcp/tools/system.py`
+### Warum zwei Arten von Routes?
+
+| Route-Typ | Verwendung | Grund |
+|-----------|-----------|-------|
+| `APIRouter` (FastAPI) | `/mcp/info`, `/mcp/health` | Normale JSON-Responses, FastAPI-Features (Swagger, Validation) |
+| `starlette.routing.Route` | `/mcp/sse`, `/mcp/messages/` | SSE braucht direkten ASGI-Zugriff (`request._send`), FastAPI wuerde den Stream unterbrechen |
+
+---
+
+## 5. FastAPI Integration (`main.py`)
+
+Die Integration in `main.py` erfolgt in zwei Schritten:
 
 ```python
-"""
-MCP Tools für System-Funktionen
-"""
+from app.mcp.routes import router as mcp_router, get_sse_routes
 
-from app.utils.metrics import get_health_status
-from app.database.models import get_prediction_stats
-
-
-def register_tools(server):
-    """Registriert System-Tools"""
-
-    server.register_tool(
-        name="health_check",
-        description="Prüft den Health-Status des Services",
-        parameters={
-            "properties": {},
-            "required": []
-        },
-        handler=health_check
-    )
-
-    server.register_tool(
-        name="get_stats",
-        description="Umfassende Service-Statistiken",
-        parameters={
-            "properties": {},
-            "required": []
-        },
-        handler=get_stats
-    )
-
-
-async def health_check():
-    """Health Status"""
-    status = await get_health_status()
-    return status
-
-
-async def get_stats():
-    """Service-Statistiken"""
-    stats = await get_prediction_stats()
-    return stats
-```
-
-## 4. FastAPI Integration
-
-**Datei: `backend/app/main.py`** - Erweitere die bestehende Datei:
-
-```python
-# Am Anfang der Datei, bei den Imports:
-from app.mcp.routes import router as mcp_router
-
-# Nach den anderen Router-Einbindungen:
-app.include_router(router)
-app.include_router(coolify_router)
-
-# MCP Server Router einbinden
+# 1. Regular FastAPI router for /mcp/info and /mcp/health
 app.include_router(mcp_router)
 
-# Im startup Event (optional, für Logging):
-@app.on_event("startup")
-async def startup():
-    # ... bestehender Code ...
-
-    logger.info("🔌 MCP Server verfügbar unter /mcp/sse")
+# 2. SSE routes need direct ASGI handling (bypass FastAPI response handling)
+for route in get_sse_routes():
+    app.routes.append(route)
 ```
 
-## 5. Nginx Proxy Konfiguration (für SSE)
+**Wichtig:** Die SSE-Routes werden mit `app.routes.append()` hinzugefuegt, NICHT mit `app.include_router()`. Das ist notwendig, weil `SseServerTransport` direkt auf die ASGI-Schicht zugreift.
 
-**Datei: `frontend/Dockerfile`** - Erweitere die Nginx-Config:
+### Vollstaendiges Beispiel
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.routes import router
+from app.mcp.routes import router as mcp_router, get_sse_routes
+
+app = FastAPI(title="Dein Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# REST API
+app.include_router(router)
+
+# MCP Server
+app.include_router(mcp_router)      # /mcp/info, /mcp/health
+for route in get_sse_routes():       # /mcp/sse, /mcp/messages/
+    app.routes.append(route)
+
+@app.on_event("startup")
+async def startup():
+    logger.info("MCP Server verfuegbar unter /mcp/sse")
+```
+
+---
+
+## 6. Tools schreiben
+
+Tools sind async-Funktionen, die bestehende Service-/DB-Funktionen aufrufen und ein Dict zurueckgeben:
+
+```python
+"""
+MCP Tools fuer Model-Verwaltung
+"""
+import logging
+from typing import Any, Dict
+
+from app.database.models import (
+    get_active_models as db_get_active_models,
+    import_model as db_import_model,
+)
+
+logger = logging.getLogger(__name__)
+
+
+async def list_active_models(include_inactive: bool = False) -> Dict[str, Any]:
+    """Liste aller aktiven ML-Modelle."""
+    try:
+        models = await db_get_active_models(include_inactive=include_inactive)
+        return {
+            "success": True,
+            "models": models,
+            "total": len(models)
+        }
+    except Exception as e:
+        logger.error(f"Fehler: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
+async def import_model(model_id: int) -> Dict[str, Any]:
+    """Importiert ein Modell."""
+    result = await db_import_model(model_id)
+    return result
+```
+
+### Wichtiges Pattern
+
+- Tools rufen **bestehende Service-Funktionen** auf (kein Code duplizieren!)
+- Jedes Tool gibt ein Dict zurueck (wird in `server.py` zu JSON serialisiert)
+- Fehlerbehandlung in jedem Tool
+
+---
+
+## 7. Tools exportieren (`tools/__init__.py`)
+
+```python
+"""
+MCP Tools Package
+"""
+from app.mcp.tools.models import (
+    list_active_models,
+    list_available_models,
+    import_model,
+    # ...
+)
+from app.mcp.tools.predictions import (
+    predict_coin,
+    get_predictions,
+    # ...
+)
+from app.mcp.tools.configuration import (
+    update_alert_config,
+    get_model_statistics,
+    # ...
+)
+from app.mcp.tools.alerts import (
+    get_alerts,
+    get_alert_details,
+    # ...
+)
+from app.mcp.tools.system import (
+    health_check,
+    get_stats,
+    # ...
+)
+
+__all__ = [
+    "list_active_models",
+    "list_available_models",
+    "import_model",
+    "predict_coin",
+    "get_predictions",
+    # ... alle Tool-Funktionen
+]
+```
+
+---
+
+## 8. Nginx Konfiguration (fuer SSE)
+
+SSE-Verbindungen benoetigen spezielle Nginx-Einstellungen:
 
 ```nginx
 # MCP-Proxy - alle /mcp/* Anfragen gehen an Backend
@@ -672,168 +481,163 @@ location /mcp/ {
     # SSE-spezifische Einstellungen (WICHTIG!)
     proxy_set_header Connection "";
     proxy_http_version 1.1;
-    proxy_buffering off;
-    proxy_cache off;
-    proxy_read_timeout 86400s;  # 24 Stunden für lange SSE-Verbindungen
+    proxy_buffering off;        # Kein Buffering fuer SSE-Streams!
+    proxy_cache off;            # Kein Caching!
+    proxy_read_timeout 86400s;  # 24h fuer lange SSE-Verbindungen
 }
 ```
 
-## 6. Claude Code Konfiguration
+**Kritische Einstellungen:**
+- `proxy_buffering off` - Ohne das werden SSE-Events gepuffert und kommen nicht durch
+- `proxy_read_timeout 86400s` - Standard-Timeout (60s) wuerde SSE-Verbindung trennen
+- `proxy_http_version 1.1` + `Connection ""` - Ermoeglicht Keep-Alive
 
-**Datei: `~/.claude/mcp_servers.json`** (auf dem Client-Rechner):
+---
+
+## 9. Client-Konfiguration
+
+### `.mcp.json` im Projektroot (fuer Claude Code)
 
 ```json
 {
   "mcpServers": {
-    "dein-service-name": {
-      "transport": "sse",
-      "url": "http://localhost:3003/mcp/sse"
+    "dein-service": {
+      "type": "sse",
+      "url": "https://dein-service.example.com/mcp/sse"
     }
   }
 }
 ```
 
-## 7. Dokumentation erstellen
+### Claude Desktop Konfiguration
 
-### 7.1 `docs/api/mcp-server.md`
-
-Erstelle eine ausführliche Dokumentation mit:
-- Übersicht und Architektur
-- Alle Endpoints (`/mcp/info`, `/mcp/sse`, `/mcp/health`)
-- Alle Tools mit Parametern und Beispiel-Responses
-- Claude Code Konfiguration
-- Troubleshooting
-
-### 7.2 `mcp-config.example.json`
+Datei: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ```json
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "_comment": "MCP Server Konfiguration - Kopiere nach ~/.claude/mcp_servers.json",
-
   "mcpServers": {
     "dein-service": {
       "transport": "sse",
-      "url": "http://localhost:3003/mcp/sse",
-      "name": "Dein Service Name",
-      "description": "Beschreibung des Services"
+      "url": "https://dein-service.example.com/mcp/sse"
     }
   }
 }
 ```
 
-## 8. Verifikation
+### Cursor IDE
+
+Datei: `~/.cursor/mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "dein-service": {
+      "transport": "sse",
+      "url": "https://dein-service.example.com/mcp/sse"
+    }
+  }
+}
+```
+
+---
+
+## 10. Verifikation
 
 ```bash
-# 1. Docker bauen
-docker-compose build
-
-# 2. Services starten
-docker-compose up -d
-
-# 3. MCP Info testen
+# 1. MCP Info testen
 curl http://localhost:3003/mcp/info
+# Erwartete Ausgabe: {"name": "...", "tools_count": 38, ...}
 
-# Erwartete Ausgabe:
-# {
-#   "name": "pump-server",
-#   "version": "1.0.0",
-#   "protocol": "MCP",
-#   "transport": "SSE",
-#   "tools_count": 13,
-#   "tools": [...]
-# }
-
-# 4. Health Check
+# 2. Health Check
 curl http://localhost:3003/mcp/health
 
-# 5. SSE-Verbindung testen
+# 3. SSE-Verbindung testen
 curl -N http://localhost:3003/mcp/sse
-# Sollte "event: endpoint" zurückgeben
+# Sollte "event: endpoint" mit der Messages-URL zurueckgeben
+# Dann: data: /mcp/messages/?session_id=...
 ```
 
-## 9. Tool-Schema Referenz
+---
 
-Jedes Tool wird mit folgendem Schema registriert:
-
-```python
-server.register_tool(
-    name="tool_name",                    # Eindeutiger Name
-    description="Was das Tool macht",    # Für KI-Clients
-    parameters={
-        "properties": {
-            "param1": {
-                "type": "string",        # string, integer, boolean, array, object
-                "description": "Beschreibung"
-            },
-            "param2": {
-                "type": "integer",
-                "description": "Beschreibung"
-            }
-        },
-        "required": ["param1"]           # Pflichtparameter
-    },
-    handler=async_handler_function       # Async-Funktion
-)
-```
-
-## 10. Architektur-Diagramm
+## 11. Architektur-Diagramm
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Claude Code / KI-Client                   │
-└─────────────────────────┬───────────────────────────────────┘
-                          │ SSE + JSON-RPC
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Nginx (Port 3003)                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   /api/*    │  │   /mcp/*    │  │      /* (SPA)       │  │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘  │
-└─────────┼────────────────┼──────────────────────────────────┘
-          │                │
-          ▼                ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  FastAPI Backend (Port 8000)                 │
-│                                                              │
-│  ┌─────────────────┐      ┌─────────────────────────────┐   │
-│  │   REST API      │      │      MCP Server             │   │
-│  │   /api/...      │      │  ┌─────────────────────┐    │   │
-│  └────────┬────────┘      │  │  /mcp/info          │    │   │
-│           │               │  │  /mcp/sse (GET/POST)│    │   │
-│           │               │  │  /mcp/health        │    │   │
-│           │               │  └──────────┬──────────┘    │   │
-│           │               │             │               │   │
-│           │               │  ┌──────────▼──────────┐    │   │
-│           │               │  │   Tool Registry     │    │   │
-│           │               │  │  - models.py        │    │   │
-│           │               │  │  - predictions.py   │    │   │
-│           │               │  │  - configuration.py │    │   │
-│           │               │  │  - system.py        │    │   │
-│           │               │  └──────────┬──────────┘    │   │
-│           │               └─────────────┼───────────────┘   │
-│           │                             │                   │
-│           ▼                             ▼                   │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │                  Service Layer                        │   │
-│  │         (Bestehende Business-Logik nutzen!)          │   │
-│  └──────────────────────────┬───────────────────────────┘   │
-└─────────────────────────────┼───────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │   PostgreSQL    │
-                    └─────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                   Claude Code / KI-Client                     │
+└────────────────────────┬─────────────────────────────────────┘
+                         │ SSE + JSON-RPC
+                         ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   Nginx (Port 3003)                           │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────────────┐  │
+│  │  /api/*  │  │  /mcp/*  │  │       /* (SPA)             │  │
+│  └────┬─────┘  └────┬─────┘  └────────────────────────────┘  │
+└───────┼──────────────┼───────────────────────────────────────┘
+        │              │
+        ▼              ▼
+┌──────────────────────────────────────────────────────────────┐
+│                 FastAPI Backend (Port 8000)                    │
+│                                                               │
+│  ┌────────────────┐       ┌────────────────────────────────┐  │
+│  │   REST API     │       │         MCP Server             │  │
+│  │   /api/...     │       │                                │  │
+│  └───────┬────────┘       │  /mcp/info    (FastAPI Router) │  │
+│          │                │  /mcp/health  (FastAPI Router)  │  │
+│          │                │  /mcp/sse     (ASGI Route)     │  │
+│          │                │  /mcp/messages/ (ASGI Route)   │  │
+│          │                │                                │  │
+│          │                │  ┌──────────────────────────┐   │  │
+│          │                │  │  mcp.server.Server       │   │  │
+│          │                │  │  + SseServerTransport    │   │  │
+│          │                │  └───────────┬──────────────┘   │  │
+│          │                │              │                  │  │
+│          │                │  ┌───────────▼──────────────┐   │  │
+│          │                │  │   tools/                 │   │  │
+│          │                │  │   ├── models.py          │   │  │
+│          │                │  │   ├── predictions.py     │   │  │
+│          │                │  │   ├── configuration.py   │   │  │
+│          │                │  │   ├── alerts.py          │   │  │
+│          │                │  │   └── system.py          │   │  │
+│          │                │  └──────────────────────────┘   │  │
+│          │                └────────────────┬────────────────┘  │
+│          │                                │                   │
+│          ▼                                ▼                   │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                   Service Layer                          │  │
+│  │          (Bestehende Business-Logik nutzen!)             │  │
+│  └─────────────────────────┬───────────────────────────────┘  │
+└────────────────────────────┼──────────────────────────────────┘
+                             ▼
+                   ┌─────────────────┐
+                   │   PostgreSQL    │
+                   └─────────────────┘
 ```
 
-## Checkliste für neue Projekte
+---
 
-- [ ] Dependencies in `requirements.txt` hinzufügen
-- [ ] MCP-Modul erstellen (`backend/app/mcp/`)
-- [ ] `server.py` mit Tool-Registry implementieren
-- [ ] `routes.py` mit SSE-Endpoints erstellen
-- [ ] Tools in `tools/` definieren (bestehende Funktionen aufrufen!)
-- [ ] MCP Router in `main.py` einbinden
-- [ ] Nginx-Config für SSE erweitern (`proxy_buffering off`!)
-- [ ] `mcp-config.example.json` erstellen
-- [ ] Dokumentation schreiben
-- [ ] Testen mit `curl` und Claude Code
+## 12. Checkliste fuer neue Projekte
+
+- [ ] Dependencies in `requirements.txt` (`mcp>=1.0.0`, `fastapi>=0.115.0`, `anyio>=4.5.0`)
+- [ ] MCP-Modul erstellen (`app/mcp/`)
+- [ ] `server.py` mit offizieller SDK (`from mcp.server import Server`)
+- [ ] `@server.list_tools()` und `@server.call_tool()` Decorator implementieren
+- [ ] `routes.py` mit `SseServerTransport` aus `mcp.server.sse`
+- [ ] `get_sse_routes()` gibt `starlette.routing.Route` zurueck
+- [ ] Tools in `tools/` - async Funktionen die bestehende Services aufrufen
+- [ ] `tools/__init__.py` - Alle Tool-Funktionen re-exportieren
+- [ ] `main.py`: `app.include_router(mcp_router)` + `app.routes.append(route)`
+- [ ] Nginx-Config: `proxy_buffering off`, `proxy_read_timeout 86400s`
+- [ ] `.mcp.json` im Projektroot erstellen
+- [ ] Testen: `curl /mcp/info`, `curl /mcp/health`, `curl -N /mcp/sse`
+
+---
+
+## Haeufige Fehler
+
+| Problem | Ursache | Loesung |
+|---------|---------|---------|
+| SSE-Verbindung bricht sofort ab | FastAPI fängt Response ab | SSE-Routes als `starlette.routing.Route` mit `app.routes.append()` hinzufuegen |
+| `anyio` Version Conflict | Alte FastAPI-Version | FastAPI >= 0.115.0 und anyio >= 4.5 verwenden |
+| Tools werden nicht erkannt | Client-Config falsch | `.mcp.json` pruefen, Client neu starten |
+| SSE-Events kommen nicht an | Nginx buffert | `proxy_buffering off` in Nginx-Config |
+| Timeout nach 60s | Nginx Standard-Timeout | `proxy_read_timeout 86400s` setzen |

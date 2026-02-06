@@ -63,12 +63,12 @@ pump-server/
 docker-compose up -d
 
 # Build specific service
-docker-compose build pump-server-backend
-docker-compose build pump-server-frontend
+docker-compose build backend
+docker-compose build frontend
 
 # View logs
 docker-compose logs -f
-docker-compose logs -f pump-server-backend
+docker-compose logs -f backend
 
 # Stop services
 docker-compose down
@@ -88,13 +88,31 @@ curl -N http://localhost:3003/mcp/sse
 
 ## API Endpoints
 
-- `GET /api/health` - Health check
+### Models
 - `GET /api/models/available` - List available models for import
 - `POST /api/models/import` - Import a model
 - `GET /api/models/active` - List active models
+- `GET /api/models/{id}` - Model details
+- `POST /api/models/{id}/activate` - Activate model
+- `POST /api/models/{id}/deactivate` - Deactivate model
+- `PATCH /api/models/{id}/rename` - Rename model
+- `DELETE /api/models/{id}` - Delete model
+
+### Predictions
 - `POST /api/predict` - Make a prediction
 - `GET /api/predictions` - List predictions
+- `GET /api/predictions/latest/{coin_id}` - Latest prediction for coin
+
+### Alerts
+- `GET /api/alerts` - List alerts
+- `GET /api/alerts/statistics` - Alert statistics
+- `PATCH /api/models/{id}/alert-config` - Update alert config
+
+### System
+- `GET /api/health` - Health check
 - `GET /api/stats` - Service statistics
+- `GET /api/metrics` - Prometheus metrics
+- `GET /api/logs` - Log tail
 
 ## MCP Server
 

@@ -104,10 +104,12 @@ Metrik für Klassifikations-Qualität, besonders für unbalancierte Daten.
 Protokoll von Anthropic für KI-Tool-Integration. Ermöglicht Claude Code und anderen KI-Clients den direkten Zugriff auf Service-Funktionen. Der pump-server bietet einen integrierten MCP Server unter `/mcp/sse`.
 
 ### MCP Server
-Komponente, die 13 Tools für KI-Clients bereitstellt:
-- Model-Tools: `list_active_models`, `import_model`, etc.
-- Prediction-Tools: `predict_coin`, `get_predictions`, etc.
-- System-Tools: `health_check`, `get_stats`
+Komponente, die 38 Tools in 5 Kategorien fuer KI-Clients bereitstellt:
+- Model-Tools (9): `list_active_models`, `import_model`, `rename_model`, `delete_model`, etc.
+- Prediction-Tools (7): `predict_coin`, `get_predictions`, `get_model_predictions`, etc.
+- Config-Tools (7): `update_alert_config`, `get_ignore_settings`, `get_max_log_entries`, etc.
+- Alert-Tools (5): `get_alerts`, `get_alert_details`, `get_alert_statistics`, etc.
+- System-Tools (10): `health_check`, `get_stats`, `get_logs`, `restart_system`, etc.
 
 ### MCP Tool
 Eine Funktion, die über das MCP-Protokoll aufgerufen werden kann. Tools haben definierte Input-Parameter und geben strukturierte JSON-Responses zurück.

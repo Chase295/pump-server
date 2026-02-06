@@ -37,7 +37,7 @@
 │                                    │                                    │
 │                                    ▼                                    │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                   pump-server-backend                            │   │
+│  │                   backend                                       │   │
 │  │  ┌─────────────────────────────────────────────────────────┐    │   │
 │  │  │                    SUPERVISOR                            │    │   │
 │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │    │   │
@@ -195,8 +195,8 @@ supervisord
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Weiterführende Dokumentation
+## Weiterfuehrende Dokumentation
 
 - [Backend Architektur](backend.md) - Detaillierte Backend-Dokumentation
-- [Frontend Architektur](frontend.md) - React UI Dokumentation
-- [Datenfluss](data-flow.md) - Detaillierte Flow-Diagramme
+- [MCP Server](../api/mcp-server.md) - MCP Server API (38 Tools)
+- [Glossar](../glossary.md) - Begriffe und Definitionen

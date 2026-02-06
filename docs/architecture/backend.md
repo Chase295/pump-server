@@ -31,15 +31,16 @@ backend/
 │   │   ├── ath_tracker.py      # ATH Tracking
 │   │   └── utils.py            # DB Utilities
 │   │
-│   ├── mcp/                    # MCP Server für KI-Integration
+│   ├── mcp/                    # MCP Server fuer KI-Integration
 │   │   ├── __init__.py
-│   │   ├── server.py           # MCP Server & Tool-Registry
-│   │   ├── routes.py           # FastAPI SSE Endpoints
-│   │   └── tools/              # 13 MCP Tools
-│   │       ├── models.py       # Model-Management Tools
-│   │       ├── predictions.py  # Prediction Tools
-│   │       ├── configuration.py # Config Tools
-│   │       └── system.py       # System Tools
+│   │   ├── server.py           # MCP Server (offizielle mcp SDK)
+│   │   ├── routes.py           # SSE Transport + FastAPI Endpoints
+│   │   └── tools/              # 38 MCP Tools in 5 Kategorien
+│   │       ├── models.py       # 9 Model-Management Tools
+│   │       ├── predictions.py  # 7 Prediction Tools
+│   │       ├── configuration.py # 7 Config Tools
+│   │       ├── alerts.py       # 5 Alert Tools
+│   │       └── system.py       # 10 System Tools
 │   │
 │   ├── prediction/
 │   │   ├── __init__.py
@@ -386,8 +387,7 @@ class ValidationError(MLTrainingError)
 - Feature-Anzahl dynamisch aus Modell-Metadata
 - Automatische Target Variable Handling
 
-## Weiterführende Dokumentation
+## Weiterfuehrende Dokumentation
 
-- [API Endpoints](../api/endpoints.md) - Vollständige API-Dokumentation
-- [Prediction Engine](../algorithms/prediction-engine.md) - ML Pipeline Details
-- [Event Handler](../algorithms/event-handler.md) - Event Processing
+- [MCP Server](../api/mcp-server.md) - MCP Server API (38 Tools)
+- [Glossar](../glossary.md) - Begriffe und Definitionen

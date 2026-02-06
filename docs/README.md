@@ -1,6 +1,6 @@
 # Pump Server - Entwicklerdokumentation
 
-Pump Server für Kryptowährungs-Vorhersagen mit trainiereten Machine Learning Modellen.
+Pump Server fuer Kryptowaehrungs-Vorhersagen mit trainierten Machine Learning Modellen.
 
 ## Quick Start
 
@@ -12,50 +12,35 @@ cp .env.example .env
 # 2. Services starten
 docker-compose up -d
 
-# 3. Frontend öffnen
+# 3. Frontend oeffnen
 open http://localhost:3003
 ```
 
-## Dokumentationsübersicht
+## Dokumentationsuebersicht
 
-### Architecture
+### Architektur
 | Datei | Beschreibung |
 |-------|--------------|
 | [overview.md](architecture/overview.md) | System-Architektur, Tech-Stack, Diagramme |
-| [backend.md](architecture/backend.md) | FastAPI Backend, Module, Supervisor |
-| [frontend.md](architecture/frontend.md) | React UI, Components, State Management |
-| [data-flow.md](architecture/data-flow.md) | Datenfluss-Diagramme, Event Processing |
+| [backend.md](architecture/backend.md) | FastAPI Backend, Module, 38 MCP Tools |
 
 ### API
 | Datei | Beschreibung |
 |-------|--------------|
-| [endpoints.md](api/endpoints.md) | Alle 40+ REST API Endpoints |
-| [schemas.md](api/schemas.md) | Pydantic & TypeScript Schemas |
-| [mcp-server.md](api/mcp-server.md) | MCP Server für Claude Code Integration |
+| [mcp-server.md](api/mcp-server.md) | MCP Server - 38 Tools in 5 Kategorien |
 
-### Algorithms
+### Anleitungen
 | Datei | Beschreibung |
 |-------|--------------|
-| [prediction-engine.md](algorithms/prediction-engine.md) | ML Prediction Pipeline |
-| [feature-processing.md](algorithms/feature-processing.md) | Feature Engineering |
-| [alert-evaluation.md](algorithms/alert-evaluation.md) | Alert Evaluator Service |
-| [event-handler.md](algorithms/event-handler.md) | Event-Driven Processing |
+| [MCP_INTEGRATION_ANLEITUNG.md](MCP_INTEGRATION_ANLEITUNG.md) | MCP Server in FastAPI integrieren (Vorlage fuer neue Projekte) |
 
-### Database
+### Planung
 | Datei | Beschreibung |
 |-------|--------------|
-| [schema.md](database/schema.md) | Tabellen, ER-Diagramm, Indexes |
-| [migrations.md](database/migrations.md) | Migration History & Patterns |
-| [queries.md](database/queries.md) | Wichtige SQL Queries |
+| [ALERT_SYSTEM_PLAN.md](ALERT_SYSTEM_PLAN.md) | Alert-System Planungsdokument |
+| [PLAN_MODEL_IMPORT_REDESIGN.md](PLAN_MODEL_IMPORT_REDESIGN.md) | Model-Import Redesign Plan |
 
-### Deployment
-| Datei | Beschreibung |
-|-------|--------------|
-| [docker.md](deployment/docker.md) | Docker Compose, Dockerfiles |
-| [environment.md](deployment/environment.md) | Umgebungsvariablen |
-| [monitoring.md](deployment/monitoring.md) | Health Checks, Prometheus |
-
-### Reference
+### Referenz
 | Datei | Beschreibung |
 |-------|--------------|
 | [glossary.md](glossary.md) | Begriffe und Definitionen |
@@ -68,7 +53,7 @@ pump-server/
 │   ├── app/
 │   │   ├── api/            # REST API Routes & Schemas
 │   │   ├── database/       # DB Models & Connection
-│   │   ├── mcp/            # MCP Server für KI-Integration
+│   │   ├── mcp/            # MCP Server (38 Tools)
 │   │   ├── prediction/     # ML Engine & Processing
 │   │   └── utils/          # Config, Logging, Metrics
 │   ├── Dockerfile
@@ -81,9 +66,10 @@ pump-server/
 │   │   └── types/          # TypeScript Types
 │   └── Dockerfile
 ├── docs/                   # Diese Dokumentation
-├── sql/                    # SQL Migrations
+├── sql/                    # SQL Migrations & Schema
 ├── docker-compose.yml
 ├── .env.example
+├── .mcp.json               # MCP Client-Konfiguration
 └── CLAUDE.md               # AI Assistant Guide
 ```
 
@@ -93,20 +79,21 @@ pump-server/
 |------------|-------------|
 | Backend | Python 3.11, FastAPI, asyncpg |
 | ML | scikit-learn, XGBoost |
-| Frontend | React 18, TypeScript, MUI v7 |
+| Frontend | React 18, TypeScript, MUI v7, Zustand, React Query |
 | Database | PostgreSQL (extern) |
+| MCP Server | Offizielle MCP SDK, SSE Transport |
 | Deployment | Docker, Nginx, Supervisor |
-| Monitoring | Prometheus Metrics |
 
 ## Services
 
 | Service | Port | Beschreibung |
 |---------|------|--------------|
-| pump-server-backend | 8000 (intern) | FastAPI + Event Handler + Streamlit |
-| pump-server-frontend | 3003 | React UI mit Nginx Proxy |
+| backend | 8000 (intern) | FastAPI + Event Handler + Streamlit |
+| frontend | 3003 | React UI mit Nginx Proxy |
 
-## Weiterführende Links
+## Weiterfuehrende Links
 
 - [CLAUDE.md](../CLAUDE.md) - AI Assistant Konfiguration
 - [.env.example](../.env.example) - Beispiel Environment
 - [docker-compose.yml](../docker-compose.yml) - Docker Setup
+- [sql/SCHEMA_DOKUMENTATION.md](../sql/SCHEMA_DOKUMENTATION.md) - Datenbank-Schema
