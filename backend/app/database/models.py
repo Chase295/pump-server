@@ -682,13 +682,42 @@ async def activate_model(active_model_id: int) -> bool:
     local_model_path = model_row.get('local_model_path')
     model_name = model_row.get('custom_name') or f"Modell {model_row['model_id']}"
     
-    # 2. Validiere Modell-Datei BEVOR Aktivierung
+    # 2. Validiere Modell-Datei BEVOR Aktivierung (mit Auto-Recovery)
     if local_model_path:
         try:
             from app.prediction.model_manager import validate_model_file
             validation_result = validate_model_file(local_model_path)
             logger.info(f"✅ Modell {active_model_id} ({model_name}) erfolgreich validiert vor Aktivierung")
-        except (FileNotFoundError, ValueError) as e:
+        except FileNotFoundError:
+            # Modell-Datei fehlt - versuche Recovery vom Training Service
+            logger.warning(
+                f"⚠️ Modell-Datei fehlt für {active_model_id} ({model_name}), "
+                f"versuche Wiederherstellung vom Training Service..."
+            )
+            try:
+                from app.prediction.model_manager import recover_model_file
+                recovered_path = await recover_model_file({
+                    'model_id': model_row['model_id'],
+                    'local_model_path': local_model_path
+                })
+
+                # DB-Pfad aktualisieren falls nötig
+                if recovered_path != local_model_path:
+                    await pool.execute("""
+                        UPDATE prediction_active_models
+                        SET local_model_path = $1, updated_at = NOW()
+                        WHERE id = $2
+                    """, recovered_path, active_model_id)
+                    local_model_path = recovered_path
+
+                # Erneut validieren mit wiederhergestellter Datei
+                validation_result = validate_model_file(recovered_path)
+                logger.info(f"✅ Modell {active_model_id} ({model_name}) wiederhergestellt und validiert")
+            except Exception as recovery_error:
+                error_msg = f"Modell-Datei fehlt und Recovery fehlgeschlagen: {recovery_error}"
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+        except ValueError as e:
             error_msg = f"Modell-Datei ist ungültig und kann nicht aktiviert werden: {str(e)}"
             logger.error(f"❌ {error_msg}")
             raise ValueError(error_msg)

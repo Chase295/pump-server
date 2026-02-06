@@ -6,7 +6,7 @@ Verwaltet Modell-Laden, Caching und Download vom Training Service.
 import os
 import joblib
 import aiohttp
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from functools import lru_cache
 from app.utils.config import MODEL_STORAGE_PATH, TRAINING_SERVICE_API_URL
 from app.utils.logging_config import get_logger
@@ -237,4 +237,100 @@ def validate_model_file(model_file_path: str) -> Dict[str, Any]:
         error_msg = f"Fehler beim Laden des Modells: {str(e)}"
         logger.error(f"❌ {error_msg}", exc_info=True)
         raise ValueError(error_msg)
+
+
+async def recover_model_file(model_config: Dict[str, Any]) -> str:
+    """
+    Stellt eine fehlende Modell-Datei vom Training Service wieder her.
+
+    Args:
+        model_config: Modell-Konfiguration mit 'model_id' und 'local_model_path'
+
+    Returns:
+        Lokaler Pfad zur wiederhergestellten Modell-Datei
+
+    Raises:
+        FileNotFoundError: Wenn Recovery fehlschlägt
+    """
+    model_id = model_config['model_id']
+    expected_path = model_config.get('local_model_path')
+
+    logger.warning(
+        f"🔄 Versuche fehlende Modell-Datei wiederherzustellen: "
+        f"model_id={model_id} (erwartet: {expected_path})"
+    )
+
+    try:
+        recovered_path = await download_model_file(model_id)
+
+        # Cache-Eintrag für den alten Pfad leeren
+        if expected_path and expected_path in MODEL_CACHE:
+            del MODEL_CACHE[expected_path]
+
+        logger.info(f"✅ Modell-Datei wiederhergestellt: model_id={model_id} -> {recovered_path}")
+        return recovered_path
+    except Exception as e:
+        logger.error(f"❌ Recovery fehlgeschlagen für model_id={model_id}: {e}")
+        raise FileNotFoundError(
+            f"Modell-Datei fehlt und Recovery fehlgeschlagen für model_id={model_id}: {e}"
+        )
+
+
+async def ensure_model_files() -> Dict[str, int]:
+    """
+    Prüft alle Modelle in prediction_active_models und lädt fehlende neu herunter.
+    Wird beim Startup aufgerufen, z.B. nach Umzug auf neuen Docker-Host.
+
+    Returns:
+        Dict mit 'checked', 'missing', 'recovered', 'failed' Zählern
+    """
+    from app.database.connection import get_pool
+
+    stats = {'checked': 0, 'missing': 0, 'recovered': 0, 'failed': 0}
+
+    pool = await get_pool()
+    rows = await pool.fetch("""
+        SELECT id, model_id, local_model_path, model_name
+        FROM prediction_active_models
+    """)
+
+    for row in rows:
+        stats['checked'] += 1
+        local_path = row['local_model_path']
+        model_id = row['model_id']
+
+        if local_path and os.path.exists(local_path):
+            continue
+
+        stats['missing'] += 1
+        logger.warning(
+            f"⚠️ Modell-Datei fehlt: model_id={model_id} "
+            f"(active_model_id={row['id']}, Name: {row['model_name']}), "
+            f"Pfad: {local_path}"
+        )
+
+        try:
+            recovered_path = await download_model_file(model_id)
+
+            # DB-Pfad aktualisieren falls sich der Pfad geändert hat
+            if recovered_path != local_path:
+                await pool.execute("""
+                    UPDATE prediction_active_models
+                    SET local_model_path = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, recovered_path, row['id'])
+                logger.info(
+                    f"📝 local_model_path aktualisiert für active_model_id={row['id']}: "
+                    f"{local_path} -> {recovered_path}"
+                )
+
+            stats['recovered'] += 1
+            logger.info(f"✅ Modell wiederhergestellt: model_id={model_id} ({row['model_name']})")
+        except Exception as e:
+            stats['failed'] += 1
+            logger.error(
+                f"❌ Recovery fehlgeschlagen für model_id={model_id} ({row['model_name']}): {e}"
+            )
+
+    return stats
 

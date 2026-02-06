@@ -43,7 +43,30 @@ async def predict_coin(
     start_time = time.time()
     
     try:
-        # 1. Bereite Features auf
+        # 1. Lade Modell (aus Cache oder Datei) - VOR Features, damit Recovery greifen kann
+        try:
+            model = get_model(model_config)
+        except FileNotFoundError:
+            # Modell-Datei fehlt - versuche Recovery vom Training Service
+            logger.warning(
+                f"⚠️ Modell-Datei fehlt für model_id={model_config['model_id']}, "
+                f"versuche Wiederherstellung..."
+            )
+            from app.prediction.model_manager import recover_model_file
+            recovered_path = await recover_model_file(model_config)
+            model_config['local_model_path'] = recovered_path
+
+            # DB-Pfad aktualisieren
+            if pool:
+                await pool.execute("""
+                    UPDATE prediction_active_models
+                    SET local_model_path = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, recovered_path, model_config.get('id'))
+
+            model = get_model(model_config)
+
+        # 2. Bereite Features auf (Modell ist jetzt garantiert auf Disk)
         feature_start = time.time()
         features_df = await prepare_features(
             coin_id=coin_id,
@@ -52,9 +75,6 @@ async def predict_coin(
         )
         feature_duration = time.time() - feature_start
         ml_feature_processing_duration_seconds.observe(feature_duration)
-        
-        # 2. Lade Modell (aus Cache oder Datei)
-        model = get_model(model_config)
         
         # 3. Mache Vorhersage
         X = features_df.values

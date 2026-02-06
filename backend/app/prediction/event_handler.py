@@ -577,7 +577,27 @@ class EventHandler:
         except Exception as e:
             logger.error(f"❌ Fehler beim Laden aktiver Modelle: {e}")
             self.active_models = []
-        
+
+        # Prüfe und stelle fehlende Modell-Dateien wieder her (z.B. nach Docker-Umzug)
+        try:
+            from app.prediction.model_manager import ensure_model_files
+            recovery_stats = await ensure_model_files()
+            if recovery_stats['missing'] > 0:
+                logger.info(
+                    f"🔄 Modell-Recovery: geprüft={recovery_stats['checked']}, "
+                    f"fehlend={recovery_stats['missing']}, "
+                    f"wiederhergestellt={recovery_stats['recovered']}, "
+                    f"fehlgeschlagen={recovery_stats['failed']}"
+                )
+                # Modelle neu laden falls welche wiederhergestellt wurden
+                if recovery_stats['recovered'] > 0:
+                    self.active_models = await get_active_models()
+                    logger.info(f"✅ Aktive Modelle nach Recovery neu geladen: {len(self.active_models)}")
+            else:
+                logger.info("✅ Alle Modell-Dateien vorhanden, keine Recovery nötig")
+        except Exception as e:
+            logger.error(f"❌ Fehler bei Modell-Recovery: {e}", exc_info=True)
+
         # Versuche LISTEN/NOTIFY
         await self.setup_listener()
         

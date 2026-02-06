@@ -81,6 +81,22 @@ async def startup():
     except Exception as e:
         logger.error(f"❌ Fehler beim Starten des Alert-Evaluators: {e}", exc_info=True)
 
+    # Prüfe und stelle fehlende Modell-Dateien wieder her (z.B. nach Docker-Umzug)
+    try:
+        from app.prediction.model_manager import ensure_model_files
+        recovery_stats = await ensure_model_files()
+        if recovery_stats['missing'] > 0:
+            logger.info(
+                f"🔄 Modell-Recovery beim Startup: geprüft={recovery_stats['checked']}, "
+                f"fehlend={recovery_stats['missing']}, "
+                f"wiederhergestellt={recovery_stats['recovered']}, "
+                f"fehlgeschlagen={recovery_stats['failed']}"
+            )
+        else:
+            logger.info("✅ Alle Modell-Dateien vorhanden")
+    except Exception as e:
+        logger.error(f"❌ Fehler bei Modell-Recovery beim Startup: {e}", exc_info=True)
+
     # Event-Handler läuft als separater Supervisor-Prozess
     logger.info("ℹ️ Event-Handler läuft als separater Supervisor-Prozess")
 
