@@ -52,19 +52,21 @@ RUN echo 'server {\
         proxy_set_header X-Forwarded-Proto $scheme;\
     }\
     \
-    # MCP-Proxy - alle /mcp/* Anfragen gehen an Backend (für Claude Code)\
-    location /mcp/ {\
-        proxy_pass http://backend:8000/mcp/;\
+    # MCP-Proxy - Streamable HTTP Transport (für Claude.ai Web + Claude Code)\
+    location /mcp {\
+        proxy_pass http://backend:8000/mcp;\
         proxy_set_header Host $host;\
         proxy_set_header X-Real-IP $remote_addr;\
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
         proxy_set_header X-Forwarded-Proto $scheme;\
-        # SSE-spezifische Einstellungen\
+        # Streamable HTTP + SSE Support\
         proxy_set_header Connection \"\";\
         proxy_http_version 1.1;\
         proxy_buffering off;\
         proxy_cache off;\
         proxy_read_timeout 86400s;\
+        proxy_send_timeout 86400s;\
+        gzip off;\
     }\
     \
     # React SPA - alle anderen Anfragen\
