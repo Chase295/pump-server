@@ -26,6 +26,6 @@ plotly==5.18.0  # Für Charts in Streamlit
 python-json-logger==2.0.7  # Optional, wenn JSON-Logging gewünscht
 
 # MCP Server (Model Context Protocol)
-mcp>=1.0.0
+mcp>=1.8.0
 sse-starlette>=1.6.5
 

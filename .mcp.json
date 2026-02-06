@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "pump-server": {
-      "type": "sse",
-      "url": "https://pump-server.local.chase295.de/mcp/sse"
+      "type": "streamable-http",
+      "url": "https://pump-server.local.chase295.de/mcp/"
     }
   }
 }

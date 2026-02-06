@@ -1,70 +1,50 @@
 """
 MCP Routes for FastAPI
 
-Provides HTTP endpoints for MCP server communication using SSE transport.
-Uses the official MCP SDK's SseServerTransport for correct SSE handling.
+Provides HTTP endpoints for MCP server communication using Streamable HTTP transport.
+Uses the official MCP SDK's StreamableHTTPSessionManager for session handling.
 """
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 from starlette.routing import Route
-from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from app.mcp.server import get_mcp_server, PumpServerMCP
 
 logger = logging.getLogger(__name__)
 
-# SSE Transport - singleton
-_sse_transport: SseServerTransport | None = None
+# Session Manager - singleton (initialized during app lifespan)
+_session_manager: StreamableHTTPSessionManager | None = None
 
 
-def get_sse_transport() -> SseServerTransport:
-    """Returns the singleton SSE transport instance."""
-    global _sse_transport
-    if _sse_transport is None:
-        # The path is where POST messages will be sent
-        _sse_transport = SseServerTransport("/mcp/messages/")
-    return _sse_transport
-
-
-async def handle_sse(request: Request):
-    """
-    Handle SSE connections for MCP.
-
-    This is the main entry point for MCP clients connecting via SSE.
-    """
-    logger.info("MCP SSE connection established")
-
-    server = get_mcp_server()
-    transport = get_sse_transport()
-
-    async with transport.connect_sse(
-        request.scope,
-        request.receive,
-        request._send
-    ) as streams:
-        await server.run(
-            streams[0],  # read stream
-            streams[1],  # write stream
-            server.create_initialization_options()
+def get_session_manager() -> StreamableHTTPSessionManager:
+    """Returns the singleton session manager instance."""
+    global _session_manager
+    if _session_manager is None:
+        server = get_mcp_server()
+        _session_manager = StreamableHTTPSessionManager(
+            app=server,
+            json_response=True,
+            stateless=True,
         )
+    return _session_manager
 
 
-async def handle_messages(request: Request):
+async def handle_mcp_http(request: Request):
     """
-    Handle POST messages for MCP.
+    Handle all MCP Streamable HTTP requests (GET, POST, DELETE).
 
-    JSON-RPC messages from clients are sent here.
+    This is the single entry point for MCP clients using Streamable HTTP transport.
     """
-    logger.debug("MCP message received")
+    logger.debug(f"MCP HTTP request: {request.method}")
 
-    transport = get_sse_transport()
-    await transport.handle_post_message(
+    session_manager = get_session_manager()
+    await session_manager.handle_request(
         request.scope,
         request.receive,
-        request._send
+        request._send,
     )
 
 
@@ -84,9 +64,8 @@ async def mcp_info() -> dict[str, Any]:
         "name": "pump-server-mcp",
         "version": "1.0.0",
         "description": "MCP Server for Pump-Server Pump Server",
-        "transport": "sse",
-        "sse_endpoint": "/mcp/sse",
-        "messages_endpoint": "/mcp/messages/",
+        "transport": "streamable-http",
+        "endpoint": "/mcp/",
         "tools": mcp.get_tool_list(),
         "tools_count": len(mcp.get_tool_list()),
     }
@@ -102,24 +81,12 @@ async def mcp_health():
     return result
 
 
-def get_sse_routes():
+def get_streamable_http_routes():
     """
-    Returns SSE-specific routes that need direct ASGI handling.
+    Returns Streamable HTTP routes that need direct ASGI handling.
 
-    These routes bypass FastAPI's response handling because SSE
-    requires streaming directly to the ASGI send interface.
+    A single route handles GET, POST, and DELETE for Streamable HTTP transport.
     """
     return [
-        Route("/mcp/sse", endpoint=handle_sse, methods=["GET"]),
-        Route("/mcp/messages/", endpoint=handle_messages, methods=["POST"]),
+        Route("/mcp/", endpoint=handle_mcp_http, methods=["GET", "POST", "DELETE"]),
     ]
-
-
-def create_mcp_routes() -> APIRouter:
-    """
-    Factory function for backward compatibility.
-
-    Returns:
-        Configured APIRouter for MCP endpoints
-    """
-    return router
