@@ -10,7 +10,13 @@ from typing import Any, Dict, List, Optional
 from app.database.models import (
     update_alert_config as db_update_alert_config,
     get_model_statistics as db_get_model_statistics,
+    get_n8n_status_for_model as db_get_n8n_status_for_model,
+    get_ignore_settings as db_get_ignore_settings,
+    update_ignore_settings as db_update_ignore_settings,
+    get_max_log_entries_settings as db_get_max_log_entries_settings,
+    update_max_log_entries_settings as db_update_max_log_entries_settings,
 )
+from app.database.connection import get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -178,4 +184,205 @@ async def get_model_statistics(active_model_id: int) -> Dict[str, Any]:
             "success": False,
             "error": str(e),
             "statistics": None
+        }
+
+
+async def get_n8n_status(active_model_id: int) -> Dict[str, Any]:
+    """
+    Prüft den n8n Webhook-Status für ein Modell.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit n8n-Status (ok, error, unknown, no_url)
+    """
+    try:
+        result = await db_get_n8n_status_for_model(active_model_id)
+        return {
+            "success": True,
+            "active_model_id": active_model_id,
+            "n8n_status": result,
+        }
+    except Exception as e:
+        logger.error(f"Error getting n8n status for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def get_ignore_settings(active_model_id: int) -> Dict[str, Any]:
+    """
+    Holt die Coin-Ignore-Einstellungen für ein Modell.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit Ignore-Einstellungen (ignore_bad_seconds, ignore_positive_seconds, ignore_alert_seconds)
+    """
+    try:
+        pool = await get_pool()
+        result = await db_get_ignore_settings(pool, active_model_id)
+
+        if result is None:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+
+        return {
+            "success": True,
+            "active_model_id": active_model_id,
+            "settings": result,
+        }
+    except Exception as e:
+        logger.error(f"Error getting ignore settings for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def update_ignore_settings(
+    active_model_id: int,
+    ignore_bad_seconds: int,
+    ignore_positive_seconds: int,
+    ignore_alert_seconds: int
+) -> Dict[str, Any]:
+    """
+    Aktualisiert die Coin-Ignore-Einstellungen für ein Modell.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+        ignore_bad_seconds: Sekunden, die negative Coins ignoriert werden (0-86400)
+        ignore_positive_seconds: Sekunden, die positive Coins ignoriert werden (0-86400)
+        ignore_alert_seconds: Sekunden, die Alert-Coins ignoriert werden (0-86400)
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        pool = await get_pool()
+        success = await db_update_ignore_settings(
+            pool, active_model_id,
+            ignore_bad_seconds, ignore_positive_seconds, ignore_alert_seconds
+        )
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Ignore settings for model {active_model_id} updated",
+                "active_model_id": active_model_id,
+                "settings": {
+                    "ignore_bad_seconds": ignore_bad_seconds,
+                    "ignore_positive_seconds": ignore_positive_seconds,
+                    "ignore_alert_seconds": ignore_alert_seconds,
+                }
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+    except ValueError as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
+    except Exception as e:
+        logger.error(f"Error updating ignore settings for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def get_max_log_entries(active_model_id: int) -> Dict[str, Any]:
+    """
+    Holt die Max-Log-Entries-Einstellungen für ein Modell.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit Max-Log-Entries-Einstellungen
+    """
+    try:
+        pool = await get_pool()
+        result = await db_get_max_log_entries_settings(pool, active_model_id)
+
+        if result is None:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+
+        return {
+            "success": True,
+            "active_model_id": active_model_id,
+            "settings": result,
+        }
+    except Exception as e:
+        logger.error(f"Error getting max log entries for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def update_max_log_entries(
+    active_model_id: int,
+    max_log_entries_per_coin_negative: int,
+    max_log_entries_per_coin_positive: int,
+    max_log_entries_per_coin_alert: int
+) -> Dict[str, Any]:
+    """
+    Aktualisiert die Max-Log-Entries-Einstellungen für ein Modell.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+        max_log_entries_per_coin_negative: Max negative Einträge pro Coin (0-1000, 0=unbegrenzt)
+        max_log_entries_per_coin_positive: Max positive Einträge pro Coin (0-1000, 0=unbegrenzt)
+        max_log_entries_per_coin_alert: Max Alert-Einträge pro Coin (0-1000, 0=unbegrenzt)
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        pool = await get_pool()
+        success = await db_update_max_log_entries_settings(
+            pool, active_model_id,
+            max_log_entries_per_coin_negative,
+            max_log_entries_per_coin_positive,
+            max_log_entries_per_coin_alert
+        )
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Max log entries settings for model {active_model_id} updated",
+                "active_model_id": active_model_id,
+                "settings": {
+                    "max_log_entries_per_coin_negative": max_log_entries_per_coin_negative,
+                    "max_log_entries_per_coin_positive": max_log_entries_per_coin_positive,
+                    "max_log_entries_per_coin_alert": max_log_entries_per_coin_alert,
+                }
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+    except ValueError as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
+    except Exception as e:
+        logger.error(f"Error updating max log entries for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
         }

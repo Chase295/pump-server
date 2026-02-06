@@ -12,6 +12,11 @@ from app.database.models import (
     get_active_models as db_get_active_models,
     get_predictions as db_get_predictions,
     get_latest_prediction as db_get_latest_prediction,
+    get_coin_price_history as db_get_coin_price_history,
+    get_coin_predictions_for_model as db_get_coin_predictions_for_model,
+)
+from app.database.alert_models import (
+    get_coin_evaluations_for_model as db_get_coin_evaluations_for_model,
 )
 from app.database.connection import get_pool
 from app.prediction.engine import predict_coin_all_models
@@ -225,4 +230,274 @@ async def get_latest_prediction(
             "error": str(e),
             "found": False,
             "prediction": None
+        }
+
+
+async def get_model_predictions(
+    active_model_id: Optional[int] = None,
+    tag: Optional[str] = None,
+    status: Optional[str] = None,
+    coin_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """
+    Holt Model-Predictions (neue Architektur) mit Filtern.
+
+    Args:
+        active_model_id: Filter nach aktivem Modell (optional)
+        tag: Filter nach Tag: 'negativ', 'positiv', 'alert' (optional)
+        status: Filter nach Status: 'aktiv', 'inaktiv' (optional)
+        coin_id: Filter nach Coin-ID (optional)
+        limit: Max. Anzahl Ergebnisse (default: 100)
+        offset: Offset für Pagination (default: 0)
+
+    Returns:
+        Dict mit Liste von Model-Predictions
+    """
+    try:
+        pool = await get_pool()
+
+        # Build dynamic query
+        conditions = []
+        params = []
+        param_idx = 1
+
+        if active_model_id is not None:
+            conditions.append(f"active_model_id = ${param_idx}")
+            params.append(active_model_id)
+            param_idx += 1
+
+        if tag:
+            conditions.append(f"tag = ${param_idx}")
+            params.append(tag)
+            param_idx += 1
+
+        if status:
+            conditions.append(f"status = ${param_idx}")
+            params.append(status)
+            param_idx += 1
+
+        if coin_id:
+            conditions.append(f"coin_id = ${param_idx}")
+            params.append(coin_id)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions) if conditions else "TRUE"
+
+        # Count total
+        count_query = f"SELECT COUNT(*) FROM model_predictions WHERE {where_clause}"
+        total = await pool.fetchval(count_query, *params)
+
+        # Fetch results
+        query = f"""
+            SELECT * FROM model_predictions
+            WHERE {where_clause}
+            ORDER BY prediction_timestamp DESC
+            LIMIT ${param_idx} OFFSET ${param_idx + 1}
+        """
+        params.extend([limit, offset])
+
+        rows = await pool.fetch(query, *params)
+
+        predictions = []
+        for row in rows:
+            pred = dict(row)
+            for key in list(pred.keys()):
+                if isinstance(pred[key], datetime):
+                    pred[key] = str(pred[key])
+            predictions.append(pred)
+
+        return {
+            "success": True,
+            "predictions": predictions,
+            "total": total,
+            "count": len(predictions),
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as e:
+        logger.error(f"Error getting model predictions: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "predictions": [],
+            "total": 0
+        }
+
+
+async def delete_model_predictions(active_model_id: int) -> Dict[str, Any]:
+    """
+    Löscht alle Model-Predictions für ein Modell (neue Architektur).
+
+    ACHTUNG: Löscht alle Predictions (aktiv UND inaktiv)!
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        pool = await get_pool()
+
+        # Check if model exists
+        model = await pool.fetchrow(
+            "SELECT id FROM prediction_active_models WHERE id = $1",
+            active_model_id
+        )
+        if not model:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+
+        # Delete all model predictions
+        result = await pool.execute(
+            "DELETE FROM model_predictions WHERE active_model_id = $1",
+            active_model_id
+        )
+
+        deleted_count = int(result.split(" ")[-1]) if result else 0
+
+        return {
+            "success": True,
+            "message": f"Deleted {deleted_count} model predictions for model {active_model_id}",
+            "active_model_id": active_model_id,
+            "deleted_predictions": deleted_count,
+        }
+    except Exception as e:
+        logger.error(f"Error deleting model predictions for {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def reset_model_statistics(active_model_id: int) -> Dict[str, Any]:
+    """
+    Setzt die Statistiken eines Modells zurück (löscht alle Predictions aus der predictions-Tabelle).
+
+    ACHTUNG: Diese Aktion ist nicht rückgängig zu machen!
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        pool = await get_pool()
+
+        # Check if model exists
+        model = await pool.fetchrow(
+            "SELECT id FROM prediction_active_models WHERE id = $1",
+            active_model_id
+        )
+        if not model:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+
+        # Delete predictions
+        result = await pool.execute(
+            "DELETE FROM predictions WHERE active_model_id = $1",
+            active_model_id
+        )
+        deleted_count = int(result.split(" ")[-1]) if result else 0
+
+        # Reset counters
+        await pool.execute("""
+            UPDATE prediction_active_models
+            SET total_predictions = 0, last_prediction_at = NULL, updated_at = NOW()
+            WHERE id = $1
+        """, active_model_id)
+
+        return {
+            "success": True,
+            "message": f"Statistics for model {active_model_id} reset",
+            "active_model_id": active_model_id,
+            "deleted_predictions": deleted_count,
+        }
+    except Exception as e:
+        logger.error(f"Error resetting statistics for model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def get_coin_details(
+    active_model_id: int,
+    coin_id: str,
+    start_timestamp: Optional[str] = None,
+    end_timestamp: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Holt detaillierte Coin-Informationen für ein Modell (Preishistorie, Predictions, Evaluierungen).
+
+    Args:
+        active_model_id: ID des aktiven Modells
+        coin_id: Coin-ID (Mint-Adresse)
+        start_timestamp: Start-Zeitstempel (ISO-Format, optional - default: 24h zurück)
+        end_timestamp: End-Zeitstempel (ISO-Format, optional - default: jetzt)
+
+    Returns:
+        Dict mit Preishistorie, Predictions und Evaluierungen
+    """
+    try:
+        pool = await get_pool()
+
+        # Parse timestamps
+        if start_timestamp:
+            start_ts = datetime.fromisoformat(start_timestamp)
+        else:
+            from datetime import timedelta
+            start_ts = datetime.utcnow() - timedelta(hours=24)
+
+        end_ts = datetime.fromisoformat(end_timestamp) if end_timestamp else None
+
+        # Fetch all three data sources in parallel
+        price_history = await db_get_coin_price_history(
+            coin_id=coin_id,
+            start_timestamp=start_ts,
+            end_timestamp=end_ts,
+            pool=pool
+        )
+
+        predictions = await db_get_coin_predictions_for_model(
+            coin_id=coin_id,
+            active_model_id=active_model_id,
+            start_timestamp=start_ts,
+            end_timestamp=end_ts,
+            pool=pool
+        )
+
+        evaluations = await db_get_coin_evaluations_for_model(
+            coin_id=coin_id,
+            active_model_id=active_model_id,
+            start_timestamp=start_ts,
+            end_timestamp=end_ts,
+            pool=pool
+        )
+
+        return {
+            "success": True,
+            "coin_id": coin_id,
+            "active_model_id": active_model_id,
+            "price_history": price_history,
+            "predictions": predictions,
+            "evaluations": evaluations,
+            "counts": {
+                "price_points": len(price_history),
+                "predictions": len(predictions),
+                "evaluations": len(evaluations),
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting coin details for {coin_id} model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
         }

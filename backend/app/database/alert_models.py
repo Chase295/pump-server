@@ -796,9 +796,10 @@ async def get_alerts(
     total = total_row['total'] if total_row else 0
     
     # Hole Alerts (mit probability aus predictions falls nicht in alert_evaluations)
+    params.extend([limit, offset])
     if unique_coins:
         query = f"""
-            SELECT DISTINCT ON (ae.coin_id) 
+            SELECT DISTINCT ON (ae.coin_id)
                 ae.*,
                 COALESCE(ae.probability, p.probability) as probability
             FROM alert_evaluations ae
@@ -809,19 +810,17 @@ async def get_alerts(
         """
     else:
         query = f"""
-            SELECT 
+            SELECT
                 ae.*,
                 COALESCE(ae.probability, p.probability) as probability
             FROM alert_evaluations ae
             LEFT JOIN predictions p ON p.id = ae.prediction_id
             {where_clause}
-                ORDER BY 
+                ORDER BY
                     ae.alert_timestamp DESC,  -- Neueste zuerst (unabhängig vom Status)
                     ae.id DESC  -- Dann nach ID für Konsistenz
             LIMIT ${param_idx} OFFSET ${param_idx + 1}
         """
-    
-        params.extend([limit, offset])
     rows = await pool.fetch(query, *params)
     
     # OPTIMIERT: Hole alle Modell-Namen in einem Query (statt N+1 Queries)
@@ -1351,8 +1350,8 @@ async def get_alert_statistics(
         """
         stats_row = await pool.fetchrow(query, *params)
     else:
-        stats_row = await pool.fetchrow("""
-            SELECT 
+        stats_row = await pool.fetchrow(f"""
+            SELECT
                 COUNT(*) as total_alerts,
                 COUNT(*) FILTER (WHERE mp.status = 'aktiv') as pending,
                 COUNT(*) FILTER (WHERE mp.status = 'inaktiv' AND mp.evaluation_result = 'success') as success,
@@ -1436,7 +1435,7 @@ async def get_alert_statistics(
                 END as success_rate
             FROM model_predictions mp
             {where_clause}
-            """.format(where_clause=where_clause))
+            """)
     
     # Statistiken pro Modell (NEUE ARCHITEKTUR)
     if params:
@@ -1454,8 +1453,8 @@ async def get_alert_statistics(
         """
         by_model_rows = await pool.fetch(by_model_query, *params)
     else:
-        by_model_rows = await pool.fetch("""
-            SELECT 
+        by_model_rows = await pool.fetch(f"""
+            SELECT
                 mp.active_model_id,
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE mp.status = 'inaktiv' AND mp.evaluation_result IN ('success', 'failed')) as success,

@@ -15,6 +15,9 @@ from app.database.models import (
     activate_model as db_activate_model,
     deactivate_model as db_deactivate_model,
     get_model_from_training_service,
+    rename_active_model as db_rename_active_model,
+    delete_active_model as db_delete_active_model,
+    update_model_performance_metrics as db_update_model_performance_metrics,
 )
 from app.prediction.model_manager import download_model_file
 
@@ -280,6 +283,113 @@ async def deactivate_model(active_model_id: int) -> Dict[str, Any]:
             }
     except Exception as e:
         logger.error(f"Error deactivating model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def rename_model(active_model_id: int, new_name: str) -> Dict[str, Any]:
+    """
+    Benennt ein aktives Modell um.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+        new_name: Neuer Name für das Modell
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        if not new_name or not new_name.strip():
+            return {
+                "success": False,
+                "error": "new_name darf nicht leer sein",
+            }
+
+        success = await db_rename_active_model(active_model_id, new_name.strip())
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Model {active_model_id} renamed to '{new_name.strip()}'",
+                "active_model_id": active_model_id,
+                "new_name": new_name.strip(),
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+    except Exception as e:
+        logger.error(f"Error renaming model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def delete_model(active_model_id: int) -> Dict[str, Any]:
+    """
+    Löscht ein aktives Modell und alle zugehörigen Predictions.
+
+    ACHTUNG: Diese Aktion ist nicht rückgängig zu machen!
+
+    Args:
+        active_model_id: ID des aktiven Modells
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        success = await db_delete_active_model(active_model_id)
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Model {active_model_id} and all associated predictions deleted",
+                "active_model_id": active_model_id,
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Model with ID {active_model_id} not found",
+            }
+    except Exception as e:
+        logger.error(f"Error deleting model {active_model_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+async def update_model_metrics(active_model_id: int, model_id: int) -> Dict[str, Any]:
+    """
+    Aktualisiert die Performance-Metriken eines Modells vom Training-Service.
+
+    Args:
+        active_model_id: ID des aktiven Modells
+        model_id: ID des Modells im Training-Service
+
+    Returns:
+        Dict mit Ergebnis
+    """
+    try:
+        success = await db_update_model_performance_metrics(active_model_id, model_id)
+
+        if success:
+            return {
+                "success": True,
+                "message": f"Performance metrics for model {active_model_id} updated from training service",
+                "active_model_id": active_model_id,
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Could not update metrics for model {active_model_id}",
+            }
+    except Exception as e:
+        logger.error(f"Error updating metrics for model {active_model_id}: {e}")
         return {
             "success": False,
             "error": str(e),

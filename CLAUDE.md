@@ -106,11 +106,12 @@ The pump-server includes an integrated MCP (Model Context Protocol) server for A
 - `POST /mcp/messages/` - JSON-RPC messages (with session_id)
 - `GET /mcp/health` - MCP server health status
 
-### Available Tools (13)
-- **Model Tools**: list_active_models, list_available_models, import_model, get_model_details, activate_model, deactivate_model
-- **Prediction Tools**: predict_coin, get_predictions, get_latest_prediction
-- **Config Tools**: update_alert_config, get_model_statistics
-- **System Tools**: health_check, get_stats
+### Available Tools (38)
+- **Model Tools (9)**: list_active_models, list_available_models, import_model, get_model_details, activate_model, deactivate_model, rename_model, delete_model, update_model_metrics
+- **Prediction Tools (7)**: predict_coin, get_predictions, get_latest_prediction, get_model_predictions, delete_model_predictions, reset_model_statistics, get_coin_details
+- **Config Tools (7)**: update_alert_config, get_model_statistics, get_n8n_status, get_ignore_settings, update_ignore_settings, get_max_log_entries, update_max_log_entries
+- **Alert Tools (5)**: get_alerts, get_alert_details, get_alert_statistics, get_all_models_alert_statistics, delete_model_alerts
+- **System Tools (10)**: health_check, get_stats, get_system_config, update_configuration, get_logs, restart_system, delete_old_logs, migrate_performance_metrics, debug_active_models, debug_coin_metrics
 
 ## Environment Variables
 
