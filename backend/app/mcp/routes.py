@@ -88,5 +88,6 @@ def get_streamable_http_routes():
     A single route handles GET, POST, and DELETE for Streamable HTTP transport.
     """
     return [
+        Route("/mcp", endpoint=handle_mcp_http, methods=["GET", "POST", "DELETE"]),
         Route("/mcp/", endpoint=handle_mcp_http, methods=["GET", "POST", "DELETE"]),
     ]
