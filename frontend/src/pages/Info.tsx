@@ -1470,7 +1470,7 @@ const Info: React.FC = () => {
               <TableBody>
                 <TableRow>
                   <TableCell><code>list_active_models</code></TableCell>
-                  <TableCell>Liste aller aktiven ML-Modelle mit Konfiguration</TableCell>
+                  <TableCell>Liste aller aktiven Modelle mit Konfiguration</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell><code>list_available_models</code></TableCell>

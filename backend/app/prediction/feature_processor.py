@@ -25,11 +25,17 @@ async def prepare_features(
     if pool is None:
         pool = await get_pool()
 
-    # KRITISCH: Erst die tatsächliche Feature-Anzahl vom Modell lesen!
+    # KRITISCH: Erst die tatsächliche Feature-Anzahl und -Namen vom Modell lesen!
+    model_feature_names = None
     try:
         from app.prediction.model_manager import load_model
         model_file_path = model_config['local_model_path']
         model = load_model(model_file_path)
+
+        # Feature-Namen direkt vom Modell lesen (wenn vorhanden)
+        if hasattr(model, 'feature_names_in_'):
+            model_feature_names = list(model.feature_names_in_)
+            logger.info(f"Feature-Namen vom Modell gelesen: {len(model_feature_names)} Features")
 
         # XGBoost/RandomForest haben n_features_in_
         if hasattr(model, 'n_features_in_'):
@@ -39,15 +45,15 @@ async def prepare_features(
         else:
             # Fallback: Verwende Datenbank-Features
             expected_features = len(model_config['features'])
-            logger.warning(f"⚠️ Modell hat kein n_features_in_ Attribut, verwende DB-Features: {expected_features}")
+            logger.warning(f"Modell hat kein n_features_in_ Attribut, verwende DB-Features: {expected_features}")
 
-        logger.debug(f"🎯 Modell {model_config['id']} erwartet {expected_features} Features (DB hat {len(model_config['features'])})")
+        logger.debug(f"Modell {model_config['id']} erwartet {expected_features} Features (DB hat {len(model_config['features'])})")
 
     except Exception as e:
-        logger.error(f"❌ Fehler beim Laden des Modells {model_config['id']}: {e}")
+        logger.error(f"Fehler beim Laden des Modells {model_config['id']}: {e}")
         # Fallback: Verwende Datenbank-Features
         expected_features = len(model_config['features'])
-        logger.warning(f"⚠️ Verwende Fallback: {expected_features} Features aus DB")
+        logger.warning(f"Verwende Fallback: {expected_features} Features aus DB")
 
     # Hole ALLE verfügbaren Basis-Daten
     history = await get_coin_history_for_prediction(
@@ -60,49 +66,79 @@ async def prepare_features(
     if len(history) == 0:
         raise ValueError(f"Keine Daten für Coin {coin_id} gefunden")
 
-    # Feature-Engineering basierend auf Modell-Konfiguration
+    # Feature-Engineering und Feature-Auswahl
     params = model_config.get('params') or {}
-    use_engineered_features = params.get('use_engineered_features', False)
 
-    if use_engineered_features:
-        window_sizes = params.get('feature_engineering_windows', [5, 10, 15])
-        history = create_pump_detection_features(history, window_sizes=window_sizes)
+    if model_feature_names:
+        # ===== NEUER PFAD: Exakte Feature-Namen vom Modell verwenden =====
+        required_features = model_feature_names
 
-    # Features auswählen: Die ersten N Features aus der Datenbank-Liste
-    # (da das Modell nur N Features erwartet)
-    db_features = model_config['features'].copy()
-    original_db_features_count = len(db_features)
+        # Pruefe ob Feature-Engineering noetig ist
+        has_engineered = any(f for f in required_features if f not in history.columns and not f.endswith('_has_data'))
+        has_flags = any(f.endswith('_has_data') for f in required_features)
 
-    # WICHTIG: Entferne target_variable NUR wenn:
-    # 1. target_operator ist None (zeitbasierte Vorhersage)
-    # 2. UND das Modell wurde mit WENIGER Features trainiert (expected_features < original_db_features_count)
-    # 3. UND target_variable ist tatsächlich in der Feature-Liste
-    # 
-    # ABER: Wenn das Modell mit target_variable als Feature trainiert wurde (expected_features == original_db_features_count),
-    # dann sollte target_variable NICHT entfernt werden - es ist Teil des Modells!
-    target_variable = model_config.get('target_variable')
-    
-    # Prüfe ZUERST ob das Modell mit target_variable trainiert wurde
-    if expected_features == original_db_features_count:
-        # Modell wurde mit ALLEN DB-Features (inkl. target_variable) trainiert - behalte es!
-        logger.info(f"✅ BEHALTE target_variable '{target_variable}' als Feature (Modell wurde mit {expected_features} Features trainiert, DB hat {original_db_features_count})")
-        # WICHTIG: NICHT entfernen - price_close ist Teil des Modells!
-    elif (model_config.get('target_operator') is None and 
-          target_variable and 
-          target_variable in db_features and
-          expected_features < original_db_features_count):
-        # Entferne target_variable nur wenn das Modell weniger Features erwartet
-        db_features = [f for f in db_features if f != target_variable]
-        logger.info(f"🔍 ENTFERNE target_variable '{target_variable}' aus Features (Modell erwartet {expected_features}, DB hat {original_db_features_count})")
+        if has_engineered or has_flags:
+            window_sizes = params.get('feature_engineering_windows', [5, 10, 15])
+            history = create_pump_detection_features(history, window_sizes=window_sizes, include_flags=has_flags)
+
+        logger.info(f"Verwende exakte Feature-Namen vom Modell: {len(required_features)} Features")
     else:
-        logger.info(f"ℹ️  Keine Änderung an target_variable '{target_variable}' (expected={expected_features}, db_count={original_db_features_count}, operator={model_config.get('target_operator')})")
+        # ===== FALLBACK: Alter Pfad fuer Modelle ohne feature_names_in_ =====
+        use_engineered_features = params.get('use_engineered_features', False)
 
-    # Nimm nur die ersten expected_features Features
-    if len(db_features) >= expected_features:
-        required_features = db_features[:expected_features]
-    else:
-        required_features = db_features
-        logger.warning(f"⚠️ Modell erwartet {expected_features} Features, aber DB hat nur {len(db_features)}")
+        if use_engineered_features:
+            window_sizes = params.get('feature_engineering_windows', [5, 10, 15])
+            history = create_pump_detection_features(history, window_sizes=window_sizes)
+
+        # Features auswaehlen: Die ersten N Features aus der Datenbank-Liste
+        db_features = model_config['features'].copy()
+        original_db_features_count = len(db_features)
+
+        target_variable = model_config.get('target_variable')
+
+        if expected_features == original_db_features_count:
+            logger.info(f"BEHALTE target_variable '{target_variable}' als Feature (Modell wurde mit {expected_features} Features trainiert, DB hat {original_db_features_count})")
+        elif (model_config.get('target_operator') is None and
+              target_variable and
+              target_variable in db_features and
+              expected_features < original_db_features_count):
+            db_features = [f for f in db_features if f != target_variable]
+            logger.info(f"ENTFERNE target_variable '{target_variable}' aus Features (Modell erwartet {expected_features}, DB hat {original_db_features_count})")
+        else:
+            logger.info(f"Keine Aenderung an target_variable '{target_variable}' (expected={expected_features}, db_count={original_db_features_count}, operator={model_config.get('target_operator')})")
+
+        # Nimm nur die ersten expected_features Features
+        if len(db_features) >= expected_features:
+            required_features = db_features[:expected_features]
+        else:
+            if not use_engineered_features:
+                logger.warning(
+                    f"DB hat nur {len(db_features)} Features, Modell braucht {expected_features}. "
+                    f"Fuehre Feature-Engineering durch um fehlende Features zu generieren."
+                )
+                window_sizes = params.get('feature_engineering_windows', [5, 10, 15])
+                history = create_pump_detection_features(history, window_sizes=window_sizes)
+
+            available_cols = [c for c in history.columns if c not in ['mint', 'timestamp']]
+            required_features = [f for f in db_features if f in available_cols]
+
+            for col in available_cols:
+                if len(required_features) >= expected_features:
+                    break
+                if col not in required_features:
+                    required_features.append(col)
+
+            if len(required_features) < expected_features:
+                raise ValueError(
+                    f"Kann nicht genug Features generieren: {len(required_features)}/{expected_features}. "
+                    f"DB-Features: {db_features}, Verfuegbar: {len(available_cols)}"
+                )
+
+            logger.warning(
+                f"Feature-Ergaenzung: DB hatte {len(db_features)}, Modell braucht {expected_features}. "
+                f"Ergaenzt auf {len(required_features)} Features. "
+                f"ACHTUNG: Feature-Reihenfolge ist geschaetzt - Vorhersagequalitaet unklar!"
+            )
 
     # Validierung: Prüfe ob alle erforderlichen Features vorhanden sind
     missing = [f for f in required_features if f not in history.columns]
@@ -113,7 +149,11 @@ async def prepare_features(
         # Prüfe erneut
         still_missing = [f for f in required_features if f not in history.columns]
         if still_missing:
-            raise ValueError(f"Features können nicht berechnet werden: {still_missing}\nVerfügbar: {list(history.columns)}")
+            raise ValueError(
+                f"Features können nicht berechnet werden: {still_missing}\n"
+                f"Benötigt ({len(required_features)}): {required_features}\n"
+                f"Verfügbar ({len(list(history.columns))}): {sorted(list(history.columns))}"
+            )
 
     # Features in der korrekten Reihenfolge zurückgeben
     latest_data = history.iloc[-1:][required_features]
@@ -232,16 +272,30 @@ def add_ath_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_pump_detection_features(
     data: pd.DataFrame,
-    window_sizes: list = [5, 10, 15]
+    window_sizes: list = [5, 10, 15],
+    include_flags: bool = False
 ) -> pd.DataFrame:
     """
     Erstellt zusätzliche Features für Pump-Detection.
     GLEICHE Logik wie Training Service!
+
+    Args:
+        include_flags: Wenn True, werden _has_data Flag-Features erzeugt
+                       (zeigen an ob genug Daten fuer ein Window vorhanden sind)
     """
     df = data.copy()
 
     if not df.index.is_monotonic_increasing:
         df = df.sort_index()
+
+    # Coin-Age berechnen (wird fuer Flag-Features benoetigt)
+    if include_flags:
+        if hasattr(df.index, 'dtype') and pd.api.types.is_datetime64_any_dtype(df.index):
+            time_diff = (df.index - df.index[0]).total_seconds() / 60
+            df['coin_age_minutes'] = time_diff
+        else:
+            df['coin_age_minutes'] = range(len(df))
+            logger.warning("Kein Datetime-Index - verwende Zeilen-Index als Coin-Age Proxy")
 
     # Zuerst ATH-Features hinzufügen (falls nicht schon vorhanden)
     if 'rolling_ath' not in df.columns:
@@ -253,8 +307,10 @@ def create_pump_detection_features(
         df['dev_sold_cumsum'] = df['dev_sold_amount'].fillna(0).cumsum()
         for window in window_sizes:
             df[f'dev_sold_spike_{window}'] = (
-                df['dev_sold_amount'].fillna(0).rolling(window, min_periods=1).sum() > 0
+                df['dev_sold_amount'].fillna(0) > df['dev_sold_amount'].fillna(0).rolling(window, min_periods=1).mean() * 2
             ).astype(int)
+            if include_flags:
+                df[f'dev_sold_spike_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Ratio-Features (Buy-Pressure)
     if 'buy_pressure_ratio' in df.columns:
@@ -265,6 +321,9 @@ def create_pump_detection_features(
             df[f'buy_pressure_trend_{window}'] = (
                 df['buy_pressure_ratio'] - df[f'buy_pressure_ma_{window}']
             )
+            if include_flags:
+                df[f'buy_pressure_ma_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'buy_pressure_trend_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Whale-Aktivität Features
     if 'whale_buy_volume_sol' in df.columns and 'whale_sell_volume_sol' in df.columns:
@@ -277,14 +336,20 @@ def create_pump_detection_features(
                 df['whale_buy_volume_sol'].fillna(0).rolling(window, min_periods=1).sum() +
                 df['whale_sell_volume_sol'].fillna(0).rolling(window, min_periods=1).sum()
             )
+            if include_flags:
+                df[f'whale_activity_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
         
         # Whale Dominanz (KRITISCH: Muss berechnet werden!)
         if 'volume_sol' in df.columns and 'whale_dominance' not in df.columns:
             df['whale_dominance'] = (
-                (df['whale_buy_volume_sol'].fillna(0) + df['whale_sell_volume_sol'].fillna(0)) / 
+                (df['whale_buy_volume_sol'].fillna(0) + df['whale_sell_volume_sol'].fillna(0)) /
                 (df['volume_sol'] + 0.001)
             ).fillna(0)
             logger.debug("✅ Berechnet: whale_dominance in create_pump_detection_features")
+
+    # Buy/Sell Ratio (wichtig für Sentiment)
+    if 'num_buys' in df.columns and 'num_sells' in df.columns:
+        df['buy_sell_ratio'] = (df['num_buys'] / (df['num_sells'] + 1)).fillna(1)
 
     # Volatilitäts-Features
     if 'volatility_pct' in df.columns:
@@ -296,48 +361,63 @@ def create_pump_detection_features(
                 df['volatility_pct'] >
                 df[f'volatility_ma_{window}'] * 1.5
             ).astype(int)
+            if include_flags:
+                df[f'volatility_ma_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'volatility_spike_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Wash-Trading Detection
     if 'unique_signer_ratio' in df.columns:
         for window in window_sizes:
             df[f'wash_trading_flag_{window}'] = (
-                df['unique_signer_ratio'].rolling(window, min_periods=1).mean() < 0.15
+                df['unique_signer_ratio'].rolling(window, min_periods=1).mean() < 0.3
             ).astype(int)
+            if include_flags:
+                df[f'wash_trading_flag_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Volume-Patterns (erweitert)
     if 'net_volume_sol' in df.columns:
         for window in window_sizes:
             df[f'net_volume_ma_{window}'] = df['net_volume_sol'].rolling(window, min_periods=1).mean()
             df[f'volume_flip_{window}'] = (
-                (df['net_volume_sol'] * df['net_volume_sol'].shift(1)) < 0
-            ).rolling(window, min_periods=1).sum()
+                np.sign(df['net_volume_sol']) != np.sign(df['net_volume_sol'].shift(window))
+            ).astype(int)
+            if include_flags:
+                df[f'net_volume_ma_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'volume_flip_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Price Momentum (erweitert)
     if 'price_close' in df.columns:
         for window in window_sizes:
-            df[f'price_change_{window}'] = df['price_close'].pct_change(periods=window) * 100
+            df[f'price_change_{window}'] = df['price_close'].diff(window)
             df[f'price_roc_{window}'] = (
                 (df['price_close'] - df['price_close'].shift(window)) /
                 df['price_close'].shift(window).replace(0, np.nan)
             ) * 100
+            # Price Acceleration (Beschleunigung der Preisaenderung)
+            price_change_raw = df['price_close'].diff(window)
+            df[f'price_acceleration_{window}'] = price_change_raw.diff(window)
+            if include_flags:
+                df[f'price_change_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'price_roc_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'price_acceleration_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # Volume Patterns (erweitert)
     if 'volume_sol' in df.columns:
         for window in window_sizes:
             rolling_avg = df['volume_sol'].rolling(window=window, min_periods=1).mean()
             df[f'volume_ratio_{window}'] = df['volume_sol'] / rolling_avg.replace(0, np.nan)
-            rolling_std = df['volume_sol'].rolling(window=window, min_periods=1).std()
-            df[f'volume_spike_{window}'] = (
-                (df['volume_sol'] - rolling_avg) / rolling_std.replace(0, np.nan)
-            )
+            vol_ma = df['volume_sol'].rolling(window * 2, min_periods=1).mean()
+            df[f'volume_spike_{window}'] = (df['volume_sol'] > vol_ma * 2).astype(int)
+            if include_flags:
+                df[f'volume_ratio_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'volume_spike_{window}_has_data'] = (df['coin_age_minutes'] >= window * 2).astype(int)
 
     # Market Cap Velocity
     if 'market_cap_close' in df.columns:
         for window in window_sizes:
-            df[f'mcap_velocity_{window}'] = (
-                (df['market_cap_close'] - df['market_cap_close'].shift(window)) /
-                df['market_cap_close'].shift(window).replace(0, np.nan)
-            ) * 100
+            df[f'mcap_velocity_{window}'] = df['market_cap_close'].diff(window)
+            if include_flags:
+                df[f'mcap_velocity_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
 
     # ATH-basierte Rolling-Window Features
     if 'ath_distance_pct' in df.columns and 'ath_breakout' in df.columns:
@@ -362,12 +442,27 @@ def create_pump_detection_features(
                     ath_breakout_volume.rolling(window, min_periods=1).mean()
                 )
 
+            if include_flags:
+                df[f'ath_distance_trend_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'ath_approach_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                df[f'ath_breakout_count_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+                if 'volume_sol' in df.columns:
+                    df[f'ath_breakout_volume_ma_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+
     # ATH-Zeit-Features
     if 'minutes_since_ath' in df.columns:
         for window in window_sizes:
             df[f'ath_age_trend_{window}'] = (
                 df['minutes_since_ath'].rolling(window, min_periods=1).mean()
             )
+            if include_flags:
+                df[f'ath_age_trend_{window}_has_data'] = (df['coin_age_minutes'] >= window).astype(int)
+
+    # Cleanup temporaere Spalten
+    if include_flags and 'coin_age_minutes' in df.columns:
+        # Nur entfernen wenn coin_age_minutes nicht in den benoetigten Features ist
+        # (wird spaeter ggf. nochmal benoetigt, aber normalerweise kein Modell-Feature)
+        pass  # Behalten - wird spaeter durch Feature-Selektion gefiltert
 
     # NaN-Werte behandeln (wie im Training Service)
     df.fillna(0, inplace=True)
@@ -520,60 +615,5 @@ def calculate_missing_features(df: pd.DataFrame, missing_features: List[str]) ->
     # NaN-Werte behandeln
     df.fillna(0, inplace=True)
     df.replace([np.inf, -np.inf], 0, inplace=True)
-
-    return df
-
-    # Fallback-Berechnungen für einzelne Features (außerhalb der Schleife)
-    for feature in missing_features:
-        if feature in df.columns:
-            continue
-
-        if feature == 'volatility_pct' and 'price_high' in df.columns and 'price_low' in df.columns and 'price_close' in df.columns:
-            df['volatility_pct'] = ((df['price_high'] - df['price_low']) / df['price_close'].replace(0, np.nan)) * 100
-            df['volatility_pct'] = df['volatility_pct'].fillna(0.0)
-            logger.debug(f"✅ Berechnet: {feature}")
-
-        elif feature == 'avg_trade_size_sol' and 'volume_sol' in df.columns and 'num_buys' in df.columns and 'num_sells' in df.columns:
-            total_trades = df['num_buys'] + df['num_sells']
-            df['avg_trade_size_sol'] = df['volume_sol'] / total_trades.replace(0, np.nan)
-            df['avg_trade_size_sol'] = df['avg_trade_size_sol'].fillna(0.0)
-            logger.debug(f"✅ Berechnet: {feature}")
-
-        elif feature.startswith('price_change_') and 'price_close' in df.columns:
-            # z.B. price_change_5, price_change_10
-            try:
-                window = int(feature.split('_')[-1])
-                df[feature] = df['price_close'].pct_change(periods=window) * 100
-                df[feature] = df[feature].fillna(0.0)
-                logger.debug(f"✅ Berechnet: {feature}")
-            except:
-                pass
-
-        elif feature.startswith('price_roc_') and 'price_close' in df.columns:
-            # z.B. price_roc_5, price_roc_10
-            try:
-                window = int(feature.split('_')[-1])
-                df[feature] = ((df['price_close'] - df['price_close'].shift(window)) /
-                              df['price_close'].shift(window).replace(0, np.nan)) * 100
-                df[feature] = df[feature].fillna(0.0)
-                logger.debug(f"✅ Berechnet: {feature}")
-            except:
-                pass
-
-        elif feature.startswith('volume_ratio_') and 'volume_sol' in df.columns:
-            # z.B. volume_ratio_5, volume_ratio_10
-            try:
-                window = int(feature.split('_')[-1])
-                rolling_avg = df['volume_sol'].rolling(window=window, min_periods=1).mean()
-                df[feature] = df['volume_sol'] / rolling_avg.replace(0, np.nan)
-                df[feature] = df[feature].fillna(1.0)
-                logger.debug(f"✅ Berechnet: {feature}")
-            except:
-                pass
-
-        # Wenn Feature immer noch fehlt, setze auf 0
-        if feature not in df.columns:
-            df[feature] = 0.0
-            logger.warning(f"⚠️ Feature '{feature}' konnte nicht berechnet werden - setze auf 0.0")
 
     return df

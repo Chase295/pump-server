@@ -17,82 +17,61 @@ logger = get_logger(__name__)
 async def evaluate_pending_predictions(batch_size: int = 100, per_model_batch_size: int = 50) -> Dict[str, int]:
     """
     Prüft alle 'aktiv' Einträge und wertet sie aus.
-    
-    ✅ OPTIMIERT: Verarbeitet jedes Modell separat - kein Blockieren!
-    Jedes Modell bekommt eigene Batch-Größe, um Rückstau zu vermeiden.
-    
+
+    Evaluiert ALLE ausstehenden Predictions unabhängig vom Modell-Status.
+    Auch Predictions von gelöschten oder deaktivierten Modellen werden ausgewertet.
+    Bei fehlender Modell-Konfiguration wird evaluation_result='not_applicable' gesetzt.
+
     Args:
         batch_size: Maximale Gesamtanzahl der Einträge (DEPRECATED - wird nicht mehr verwendet)
-        per_model_batch_size: Anzahl der Einträge pro Modell (Standard: 50)
-        
+        per_model_batch_size: Basis für Batch-Größe (Standard: 50, effektiv: 50*10=500)
+
     Returns:
         Dict mit Statistiken (evaluated, success, failed, not_applicable)
     """
     pool = await get_pool()
-    
-    # ✅ NEU: Hole zuerst alle aktiven Modell-IDs
-    active_model_ids = await pool.fetch("""
-        SELECT id FROM prediction_active_models WHERE is_active = true
-    """)
-    
-    if not active_model_ids:
-        logger.debug("ℹ️ Keine aktiven Modelle - keine Evaluierungen")
+
+    # Hole ALLE ausstehenden Predictions (unabhängig vom Modell-Status)
+    # LEFT JOIN: Auch Predictions von gelöschten/inaktiven Modellen werden evaluiert
+    rows = await pool.fetch("""
+        SELECT
+            mp.*,
+            pam.future_minutes,
+            pam.price_change_percent,
+            pam.target_direction,
+            cm_eval.price_open as eval_price_open,
+            cm_eval.price_high as eval_price_high,
+            cm_eval.price_low as eval_price_low,
+            cm_eval.price_close as eval_price_close,
+            cm_eval.market_cap_close as eval_market_cap_close,
+            cm_eval.volume_sol as eval_volume_sol,
+            cm_eval.buy_volume_sol as eval_buy_volume_sol,
+            cm_eval.sell_volume_sol as eval_sell_volume_sol,
+            cm_eval.num_buys as eval_num_buys,
+            cm_eval.num_sells as eval_num_sells,
+            cm_eval.unique_wallets as eval_unique_wallets,
+            cm_eval.phase_id_at_time as eval_phase_id
+        FROM model_predictions mp
+        LEFT JOIN prediction_active_models pam ON pam.id = mp.active_model_id
+        LEFT JOIN LATERAL (
+            SELECT *
+            FROM coin_metrics
+            WHERE mint = mp.coin_id
+              AND timestamp <= mp.evaluation_timestamp
+            ORDER BY timestamp DESC
+            LIMIT 1
+        ) cm_eval ON true
+        WHERE mp.status = 'aktiv'
+          AND mp.evaluation_timestamp <= NOW()
+        ORDER BY mp.evaluation_timestamp ASC
+        LIMIT $1
+    """, per_model_batch_size * 10)
+
+    if not rows:
+        logger.debug("ℹ️ Keine ausstehenden Evaluierungen")
         return {'evaluated': 0, 'success': 0, 'failed': 0, 'not_applicable': 0, 'errors': 0}
-    
-    # ✅ NEU: Verarbeite jedes Modell separat
-    all_rows = []
-    for model_row in active_model_ids:
-        active_model_id = model_row['id']
-        
-        # Hole ausstehende Einträge NUR für dieses Modell
-        rows = await pool.fetch("""
-            SELECT
-                mp.*,
-                pam.future_minutes,
-                pam.price_change_percent,
-                pam.target_direction,
-                -- WICHTIG: Für Alerts brauchen wir price_close_at_alert aus alert_evaluations
-                ae.alert_timestamp,
-                ae.price_close_at_alert,
-                ae.price_open_at_alert,
-                ae.price_high_at_alert,
-                ae.price_low_at_alert,
-                cm_eval.price_open as eval_price_open,
-                cm_eval.price_high as eval_price_high,
-                cm_eval.price_low as eval_price_low,
-                cm_eval.price_close as eval_price_close,
-                cm_eval.market_cap_close as eval_market_cap_close,
-                cm_eval.volume_sol as eval_volume_sol,
-                cm_eval.buy_volume_sol as eval_buy_volume_sol,
-                cm_eval.sell_volume_sol as eval_sell_volume_sol,
-                cm_eval.num_buys as eval_num_buys,
-                cm_eval.num_sells as eval_num_sells,
-                cm_eval.unique_wallets as eval_unique_wallets,
-                cm_eval.phase_id_at_time as eval_phase_id
-            FROM model_predictions mp
-            INNER JOIN prediction_active_models pam ON pam.id = mp.active_model_id AND pam.is_active = true
-            LEFT JOIN alert_evaluations ae ON ae.prediction_id = mp.prediction  -- JOIN für Alert-Daten
-            LEFT JOIN LATERAL (
-                SELECT *
-                FROM coin_metrics
-                WHERE mint = mp.coin_id
-                  AND timestamp <= mp.evaluation_timestamp
-                ORDER BY timestamp DESC
-                LIMIT 1
-            ) cm_eval ON true
-            WHERE mp.status = 'aktiv'
-              AND mp.active_model_id = $1
-              AND mp.evaluation_timestamp <= NOW()
-            ORDER BY mp.evaluation_timestamp ASC
-            LIMIT $2
-        """, active_model_id, per_model_batch_size)
-        
-        all_rows.extend(rows)
-        if rows:
-            logger.debug(f"📊 Modell {active_model_id}: {len(rows)} ausstehende Evaluierungen gefunden")
-    
-    # Sortiere alle Einträge nach evaluation_timestamp (älteste zuerst)
-    rows = sorted(all_rows, key=lambda r: r['evaluation_timestamp'])
+
+    logger.debug(f"📊 {len(rows)} ausstehende Evaluierungen gefunden")
     
     stats = {
         'evaluated': 0,
@@ -164,16 +143,10 @@ async def evaluate_pending_predictions(batch_size: int = 100, per_model_batch_si
                 else:
                     price_close_at_evaluation_to_save = float(price_close_at_evaluation_to_save)
             
-            # WICHTIG: Für Alerts verwende price_close_at_alert (Start beim Alert), nicht price_close_at_prediction!
-            # Für normale Predictions verwende weiterhin price_close_at_prediction
-            if tag == 'alert' and row.get('alert_timestamp'):
-                # ALERT: Verwende Preis zum alert_timestamp als Startpunkt
-                price_close_at_start_raw = row.get('price_close_at_alert')
-                start_timestamp_desc = "alert_timestamp"
-            else:
-                # NORMALE PREDICTION: Verwende Preis zum prediction_timestamp
-                price_close_at_start_raw = row['price_close_at_prediction']
-                start_timestamp_desc = "prediction_timestamp"
+            # Verwende immer price_close_at_prediction als Startpreis
+            # (alert_evaluations gehört zur alten predictions-Tabelle, nicht zu model_predictions)
+            price_close_at_start_raw = row['price_close_at_prediction']
+            start_timestamp_desc = "prediction_timestamp"
 
             price_close_at_evaluation_raw = price_close_at_evaluation_to_save  # Verwende gespeicherten Wert
 

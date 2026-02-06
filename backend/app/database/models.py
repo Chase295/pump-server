@@ -530,7 +530,23 @@ async def import_model(
             model_data = await get_model_from_training_service(model_id)
             if not model_data:
                 raise ValueError(f"Modell {model_id} nicht gefunden oder nicht READY im Training-Service")
-            
+
+            # Validierung: Pruefe Feature-Anzahl gegen tatsaechliches Modell
+            try:
+                import joblib
+                temp_model = joblib.load(local_model_path)
+                actual_features = getattr(temp_model, 'n_features_in_', None)
+                api_features = len(model_data.get('features', []))
+                if actual_features and actual_features != api_features:
+                    logger.warning(
+                        f"⚠️ FEATURE-MISMATCH bei Import von Modell {model_id}: "
+                        f"Modell erwartet {actual_features} Features, "
+                        f"Training Service liefert {api_features} Features. "
+                        f"Prediction wird trotzdem versucht (Feature-Ergaenzung aktiv)."
+                    )
+            except Exception as e:
+                logger.debug(f"Feature-Validierung uebersprungen: {e}")
+
             # 3. Konvertiere JSONB-Felder zu JSON-Strings (asyncpg benötigt explizite Konvertierung)
             import json
             

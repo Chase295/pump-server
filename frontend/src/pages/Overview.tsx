@@ -1,6 +1,6 @@
 /**
  * Overview Page
- * Hauptübersicht aller ML-Modelle mit Live-Daten aus der API
+ * Hauptübersicht aller Modelle mit Live-Daten aus der API
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -217,7 +217,7 @@ const Overview: React.FC = () => {
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            🔮 ML Modelle Übersicht
+            🔮 Modelle Übersicht
           </Typography>
           <Button
             variant="outlined"
@@ -231,7 +231,7 @@ const Overview: React.FC = () => {
         </Box>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Verwalten Sie Ihre Machine Learning Modelle für Krypto-Preisvorhersagen
+          Verwalten Sie Ihre Modelle für Krypto-Preisvorhersagen
         </Typography>
 
         {/* Statistiken */}
@@ -262,7 +262,7 @@ const Overview: React.FC = () => {
               Keine Modelle gefunden
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Es wurden noch keine ML-Modelle importiert oder konfiguriert.
+              Es wurden noch keine Modelle importiert oder konfiguriert.
             </Typography>
             <Button
               variant="contained"

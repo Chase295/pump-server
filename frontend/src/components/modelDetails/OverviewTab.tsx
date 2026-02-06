@@ -108,7 +108,15 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ model }) => {
               <ListItemText primary="Alert-Schwelle" secondary={`${(model.alert_threshold * 100).toFixed(1)}%`} />
             </ListItem>
             <ListItem>
-              <ListItemText primary="Coin-Filter" secondary={model.coin_filter_mode === 'all' ? 'Alle Coins' : 'Whitelist'} />
+              <ListItemText
+                primary="Coin-Filter"
+                secondary={
+                  (model.coin_filter_mode === 'all' ? 'Alle Coins' : 'Whitelist')
+                  + (model.phases && model.phases.length > 0
+                    ? ` (nur Phase ${model.phases.join(', ')})`
+                    : ' (alle Phasen)')
+                }
+              />
             </ListItem>
             <ListItem>
               <ListItemText

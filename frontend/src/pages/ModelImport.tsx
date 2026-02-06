@@ -1,6 +1,6 @@
 /**
  * ModelImport Page
- * Importiert neue ML-Modelle aus dem Training-Service
+ * Importiert neue Modelle aus dem Training-Service
  * Kachel-Ansicht (Card-Grid) für bessere Übersicht
  */
 import React, { useState, useEffect } from 'react';
@@ -219,7 +219,7 @@ const ModelImport: React.FC = () => {
         </Box>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Importiere neue ML-Modelle aus dem Training-Service in dein Prediction-System
+          Importiere neue Modelle aus dem Training-Service in deinen Pump Server
         </Typography>
 
         {/* Statistiken */}

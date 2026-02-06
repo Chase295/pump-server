@@ -1,5 +1,5 @@
 /**
- * TypeScript-Typen für ML-Modelle und API-Responses
+ * TypeScript-Typen für Modelle und API-Responses
  * Migriert von Streamlit-Utils
  */
 
@@ -17,6 +17,7 @@ export interface Model {
   price_change_percent: number;
   target_direction: string;
   features: string[];
+  phases?: number[] | null;
 
   // Status
   is_active: boolean;

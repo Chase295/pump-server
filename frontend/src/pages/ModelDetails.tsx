@@ -1,6 +1,6 @@
 /**
  * ModelDetails Page
- * Vollständige Detailansicht eines ML-Modells mit Tabs
+ * Vollständige Detailansicht eines Modells mit Tabs
  */
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

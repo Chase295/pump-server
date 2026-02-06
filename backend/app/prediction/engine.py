@@ -164,7 +164,12 @@ async def predict_coin_all_models(
     # Filtere None und Exceptions heraus
     valid_results = [r for r in results if r is not None and not isinstance(r, Exception)]
     
-    if len(valid_results) < len(active_models):
+    if len(valid_results) == 0 and len(active_models) > 0:
+        logger.error(
+            f"CRITICAL: ALLE {len(active_models)} Modelle fehlgeschlagen fuer Coin {coin_id[:8]}... "
+            f"Wahrscheinlich Feature-Mismatch oder Daten-Problem."
+        )
+    elif len(valid_results) < len(active_models):
         failed_count = len(active_models) - len(valid_results)
         logger.warning(
             f"⚠️ Vorhersagen für Coin {coin_id[:8]}...: {len(valid_results)}/{len(active_models)} erfolgreich, {failed_count} fehlgeschlagen"

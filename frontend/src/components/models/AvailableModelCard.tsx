@@ -1,6 +1,6 @@
 /**
  * AvailableModelCard Component
- * Darstellung eines verfügbaren ML-Modells zum Import
+ * Darstellung eines verfügbaren Modells zum Import
  * Design konsistent mit ModelCard für aktive Modelle
  */
 import React, { useMemo } from 'react';

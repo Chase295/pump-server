@@ -102,6 +102,9 @@ const CurrentConfigDisplay: React.FC<CurrentConfigDisplayProps> = ({ model }) =>
                   {model.coin_filter_mode === 'all'
                     ? 'Alle Coins'
                     : `${model.coin_whitelist?.length || 0} Coins (Whitelist)`}
+                  {model.phases && model.phases.length > 0
+                    ? ` (nur Phase ${model.phases.join(', ')})`
+                    : ''}
                 </Typography>
               </Box>
             </Box>

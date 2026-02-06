@@ -1,6 +1,6 @@
 /**
  * ModelCard Component
- * Darstellung eines einzelnen ML-Modells in der Übersicht
+ * Darstellung eines einzelnen Modells in der Übersicht
  * Performance-optimiert mit React.memo und useMemo
  */
 import React, { useMemo } from 'react';
